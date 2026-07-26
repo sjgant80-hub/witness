@@ -1,0 +1,13 @@
+{
+  "name": "witness",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "witness.mjs",
+  "bin": {
+    "witness": "witness.mjs"
+  },
+  "scripts": {
+    "test": "node --test witness.test.mjs"
+  },
+  "license": "MIT"
+}
