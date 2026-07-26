@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>witness — a deterministic build gate</title>
+<style>
+  :root {
+    --bg: #0d1017; --panel: #151a23; --ink: #e6edf3; --dim: #9aa7b4; --line: #232a35;
+    --acc: #5ac8a8; --warn: #e0a458; --kill: #6ee7b7; --live: #7dd3fc; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f7f9fb; --panel:#fff; --ink:#141a21; --dim:#586470; --line:#e3e8ee; --acc:#12876a; --warn:#a5610f; --kill:#0d7a54; --live:#0369a1; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 22px 80px; }
+  h1 { font-size: 2.6rem; margin:0 0 4px; letter-spacing:-.02em; }
+  h1 .dot { color:var(--acc); }
+  .tag { color:var(--dim); font-size:1.1rem; margin:0 0 26px; }
+  .live { display:inline-block; margin-bottom:34px; font-family:var(--mono); font-size:.82rem; color:var(--live); border:1px solid var(--line); border-radius:7px; padding:5px 11px; text-decoration:none; }
+  .live:hover { border-color:var(--live); }
+  h2 { font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:40px 0 14px; font-weight:600; }
+  p { color:var(--ink); }
+  .lead { font-size:1.12rem; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .card h3 { margin:0 0 8px; font-size:1.05rem; }
+  .card h3 .k { font-family:var(--mono); font-size:.8rem; color:var(--acc); }
+  .card p { margin:0; color:var(--dim); font-size:.95rem; }
+  pre { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:.86rem; line-height:1.7; }
+  .c-dim { color:var(--dim); }
+  .c-kill { color:var(--kill); }
+  .c-warn { color:var(--warn); }
+  code { font-family:var(--mono); font-size:.9em; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
+  pre code { background:none; border:0; padding:0; }
+  .note { border-left:3px solid var(--acc); padding:6px 0 6px 16px; color:var(--dim); margin:16px 0; }
+  footer { margin-top:56px; padding-top:22px; border-top:1px solid var(--line); color:var(--dim); font-size:.85rem; }
+  footer a { color:var(--live); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>witness<span class="dot">.</span></h1>
+  <p class="tag">A deterministic build gate — catch test-theatre and throw-on-malformed <em>before</em> you push.</p>
+  <a class="live" href="https://github.com/sjgant80-hub/witness">github.com/sjgant80-hub/witness →</a>
+
+  <p class="lead">Four adversarial LLM audit passes across the estate kept surfacing the <strong>same two
+  bug classes</strong>, build after build. Auditing for them cost ~1.5M tokens each time and still missed
+  some. Both are catchable <strong>deterministically</strong>, for free, in seconds — no language model,
+  no network, zero dependencies.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Mutation gate <span class="k">witness mutate</span></h3>
+      <p>Flip one operator in the source — <code>&gt;</code>→<code>&gt;=</code>, <code>&amp;&amp;</code>→<code>||</code>,
+      <code>return true</code>→<code>return false</code> — then run the project's own tests. If they still
+      pass, that line is <em>test-theatre</em>: a hole a real regression falls straight through.</p>
+    </div>
+    <div class="card">
+      <h3>Fuzz gate <span class="k">witness fuzz</span></h3>
+      <p>Throw the hostile-input battery — <code>null</code>, <code>BigInt</code>, a circular object, a
+      toxic getter, a 200k-element array — at a function. If a <em>tolerant</em> function throws, it fails
+      the never-throw boundary contract.</p>
+    </div>
+  </div>
+
+  <h2>Use it</h2>
+<pre><code><span class="c-dim"># mutation gate: mutate a file, run the tests against each mutant</span>
+npx witness mutate src/thing.mjs
+
+<span class="c-dim"># fuzz gate: throw the hostile battery at one exported function</span>
+npx witness fuzz ./src/thing.mjs verifyThing</code></pre>
+
+  <p class="c-dim">Exit code <code>0</code> when the gate is clean, non-zero when it isn't — drop it
+  straight into CI.</p>
+
+  <h2>The lesson it caught in itself</h2>
+  <p class="note">witness spawns your project's test runner. The first time it ran under its <em>own</em>
+  <code>node --test</code> suite, every mutant falsely "survived" — the spawned <code>node --test</code>
+  inherited <code>NODE_TEST_CONTEXT</code> from the parent and exited <code>0</code> even on failure. And
+  a hard kill mid-run once left a live mutant baked into a fixture. Both are now designed out — the child
+  env is scrubbed, and the gate self-heals from a sidecar backup after any interrupt. A build gate has to
+  be hardened against the exact bug classes it hunts. This one is dogfooded on itself.</p>
+
+  <h2>Verdict shape</h2>
+<pre><code>runMutations(src) <span class="c-dim">→</span> {
+  total: 14, killed: <span class="c-kill">14</span>, survived: <span class="c-kill">[]</span>,
+  score: <span class="c-kill">1.0</span>, clean: <span class="c-kill">true</span>
+}
+fuzz(verifyThing) <span class="c-dim">→</span> {
+  throwsOn: <span class="c-warn">[{ input: 'circular object', error: '…' }]</span>,
+  neverThrows: <span class="c-warn">false</span>
+}</code></pre>
+
+  <footer>
+    Part of the estate · zero dependencies · MIT ·
+    <a href="https://github.com/sjgant80-hub/witness">source</a>
+  </footer>
+</div>
+</body>
+</html>
