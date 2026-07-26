@@ -59,6 +59,14 @@ the parent runner and switched to the child-reporter protocol, exiting `0` even 
 scrubs that env var before spawning, and a regression test pins it. A build gate has to be hardened
 against the exact bug classes it hunts — this repo is dogfooded on itself.
 
+## Known limitation
+
+witness mutates source **text**, so an operator that appears inside a comment or string literal produces
+a mutant that can't change behaviour — it will always "survive" and show up as a false positive. Read the
+survivor's snippet: if the flip is inside a `//` comment or a string, dismiss it. Everything on real code
+is signal. (A survivor rate well below 1.0 on audited code is normal and useful — on the estate's own
+`fallsieve` it flagged an untested `score < minScore` boundary that four LLM audit passes had left in.)
+
 ## Design
 
 - **Spaced operators only** (`' > '`, not `'>'`) so mutation never mis-hits `=>`, `>=` inside `===`, or a
