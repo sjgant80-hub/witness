@@ -73,6 +73,36 @@ test('runMutations SELF-HEALS a source left mutated by a hard-killed prior run',
   }
 });
 
+test('TIMEOUT: a mutant that hangs the tests is bounded and counted as killed (not a hang)', () => {
+  // A test command that never exits — witness must not wait forever. The mutant did not survive (the
+  // suite never went green), so it is KILLED. This is the fallherd binary-search non-termination case.
+  const r = runMutations(SRC, { testCmd: ['node', '-e', 'setInterval(() => {}, 1000)'], timeout: 700 });
+  assert.equal(r.survived.length, 0, 'a hang is not a survivor');
+  assert.equal(r.killed, r.total, 'the hanging mutant is counted killed');
+  assert.equal(r.clean, true);
+});
+
+test('BASELINE: a reviewed-equivalent survivor is ignored, not counted against clean', () => {
+  const r = runMutations(SRC, {
+    testCmd: nodeTest('fixtures/boundary.theatre.test.mjs'),
+    baseline: [{ mutation: '> → >=', snippet: 'export const isPositive = n => n > 0;', reason: 'reviewed — equivalent' }],
+  });
+  assert.equal(r.survived.length, 0, 'the baselined survivor is no longer an unreviewed survivor');
+  assert.equal(r.ignored.length, 1, 'it is recorded as ignored, with its reason');
+  assert.equal(r.ignored[0].reason, 'reviewed — equivalent');
+  assert.equal(r.clean, true, 'clean = no UNREVIEWED survivors');
+});
+
+test('BASELINE cannot hide a real survivor whose code line changed (exact match only)', () => {
+  const r = runMutations(SRC, {
+    testCmd: nodeTest('fixtures/boundary.theatre.test.mjs'),
+    baseline: [{ mutation: '> → >=', snippet: 'const isPositive = n => n > 0; // a DIFFERENT line', reason: 'stale' }],
+  });
+  assert.equal(r.survived.length, 1, 'a stale baseline entry does not apply — you cannot baseline away a future bug');
+  assert.equal(r.ignored.length, 0);
+  assert.equal(r.clean, false);
+});
+
 test('FUZZ GATE flags a function that throws on hostile input', async () => {
   const risky = x => x.foo.bar;   // throws on null/undefined/etc.
   const r = await fuzz(risky);

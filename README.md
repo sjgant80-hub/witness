@@ -75,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npm ci
-      - uses: sjgant80-hub/witness@v0.1
+      - uses: sjgant80-hub/witness@v0.2
         with:
           files: src/gate.mjs src/verify.mjs   # the behaviour-critical files
           test-command: npm test               # your runner (default: npm test)
@@ -86,20 +86,38 @@ jobs:
 A surviving mutant on an AI-generated PR is the point: it means a test named a behaviour it does not
 actually guard. The Action turns that into a red check before the code merges.
 
-## Known limitation
+## Survivors that aren't theatre — the baseline
 
-witness mutates source **text**, so an operator that appears inside a comment or string literal produces
-a mutant that can't change behaviour — it will always "survive" and show up as a false positive. Read the
-survivor's snippet: if the flip is inside a `//` comment or a string, dismiss it. Everything on real code
-is signal. (A survivor rate well below 1.0 on audited code is normal and useful — on the estate's own
-`fallsieve` it flagged an untested `score < minScore` boundary that four LLM audit passes had left in.)
+Two kinds of survivor are *not* test-theatre and can never be killed:
+
+- **False positives** — the operator sits inside a `//` comment or a string literal, so the flip changes
+  no behaviour. Read the snippet; if it's in a comment or string, dismiss it.
+- **Equivalent mutants** — the mutation is semantically identical to the original (an idempotent
+  `max`-assignment, an out-of-bounds write a typed array silently drops, a tie-break branch that's
+  unreachable because ids are unique). No test can distinguish them. This is mutation testing's known floor.
+
+So a clean gate is unreachable on most real code — until you **review** the survivors and record the
+equivalent ones. Drop a `witness.baseline.json` next to the source:
+
+```json
+[
+  { "mutation": "< → <=", "snippet": "for (let i = 0; i < s.length; i++) {", "reason": "idempotent OOB write, dropped by the typed array" }
+]
+```
+
+Baselined survivors are reported as `ignored` (with their reason) and no longer count against `clean`.
+Each entry is a signed-off human judgement, matched by the **exact** `(mutation, code-line)` pair — so it
+stops applying the instant that line changes. **You cannot baseline away a future bug.**
 
 ## Design
 
 - **Spaced operators only** (`' > '`, not `'>'`) so mutation never mis-hits `=>`, `>=` inside `===`, or a
   bit-shift.
 - **Single-point mutations** — one operator flipped per mutant, so a surviving mutant names an exact line.
-- **Always restores** the source file in a `finally`, even on interrupt.
+- **Per-mutant timeout** — a mutant that breaks termination (flip `lo < hi` → `lo <= hi` in a binary
+  search) would otherwise hang the gate forever; it times out and counts as *killed* (the suite could not
+  survive it). Default 20s, `opts.timeout`.
+- **Always restores** the source file in a `finally`, and **self-heals** from a sidecar after a hard kill.
 - **Async-aware fuzz** — awaits the function, so an `async` throw is still caught.
 
 Zero dependencies. Deterministic. MIT.

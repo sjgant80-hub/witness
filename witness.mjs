@@ -16,7 +16,32 @@
 // ════════════════════════════════════════════════════════════════
 
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
+
+// A reviewed-equivalent baseline. Mutation testing has a well-known floor: some mutants are EQUIVALENT
+// (semantically identical to the original — an idempotent max-assignment, an out-of-bounds write silently
+// dropped by a typed array, a tie-break branch unreachable because ids are unique) and CANNOT be killed by
+// any test. They are not test-theatre. Without a way to record them, `clean` is unreachable on real code
+// and the gate cries wolf forever. A `witness.baseline.json` next to the source (or in cwd) lists reviewed
+// survivors — `[{ mutation, snippet, reason }]` — which are then reported as `ignored`, not counted against
+// `clean`. Each entry is a signed-off human judgement, and it is matched by the exact (mutation, code line)
+// pair, so it silently stops applying the moment that line changes — you cannot baseline away a future bug.
+function loadBaseline(opts, srcPath, cwd) {
+  let raw = opts.baseline;
+  if (typeof raw === 'string') { try { raw = JSON.parse(readFileSync(raw, 'utf8')); } catch { raw = []; } }
+  else if (!Array.isArray(raw)) {
+    raw = [];
+    for (const p of [join(dirname(srcPath), 'witness.baseline.json'), join(cwd, 'witness.baseline.json')]) {
+      try { raw = JSON.parse(readFileSync(p, 'utf8')); break; } catch { /* none here */ }
+    }
+  }
+  const sigs = new Map();
+  for (const e of (Array.isArray(raw) ? raw : [])) {
+    if (e && e.mutation && e.snippet) sigs.set(`${e.mutation} :: ${e.snippet}`, e.reason || 'reviewed-equivalent');
+  }
+  return sigs;
+}
 
 // A child test runner must not inherit OUR test-runner context. node:test sets NODE_TEST_CONTEXT in
 // every test-file process; if the `node --test` we spawn inherits it, it switches to the child-reporter
@@ -62,7 +87,7 @@ export function mutants(source) {
 // witness on itself). So before mutating we drop a sidecar backup holding the true original; if a prior
 // run was killed, that backup is still on disk and we self-heal from it on the next run. The estate can
 // never be left silently corrupted by an interrupted gate.
-// opts: { testCmd?: string[], cwd?: string, cap?: number }
+// opts: { testCmd?: string[], cwd?: string, cap?: number, timeout?: number, baseline?: string|array }
 export function runMutations(srcPath, opts = {}) {
   const backup = srcPath + '.witnessbak';
   // Self-heal: a leftover backup means a previous run was hard-killed with srcPath mutated. The backup
@@ -76,20 +101,31 @@ export function runMutations(srcPath, opts = {}) {
   const cwd = opts.cwd || process.cwd();
   const testCmd = opts.testCmd || ['npm', 'test'];
   const cap = opts.cap ?? 80;
+  // Per-mutant timeout. Some mutants break termination (flip `lo < hi` → `lo <= hi` in a binary search and
+  // the loop never exits). Without a bound, one such mutant hangs the whole gate forever — this actually
+  // happened sweeping fallherd. A timed-out run is a mutant the suite could NOT survive, i.e. KILLED.
+  const timeout = opts.timeout ?? 20000;
+  const baseline = loadBaseline(opts, srcPath, cwd);
 
   let all = mutants(original);
   const capped = all.length > cap;
   all = all.slice(0, cap);
 
-  const survived = [];
+  const survived = [], ignored = [];
   let killed = 0;
   try {
     for (const m of all) {
       writeFileSync(srcPath, m.source);
-      const r = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26 });
+      const r = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26, timeout });
+      // Killed unless the tests genuinely PASSED. status 0 = passed ⇒ survived. A timeout kills the child
+      // (status null, signal set) ⇒ not passed ⇒ killed, which is correct: a mutant that hangs is caught.
       const passed = r.status === 0;
-      if (passed) survived.push({ line: m.line, mutation: `${m.from} → ${m.to}`, snippet: lineOf(original, m.line) });
-      else killed++;
+      if (passed) {
+        const entry = { line: m.line, mutation: `${m.from} → ${m.to}`, snippet: lineOf(original, m.line) };
+        const sig = `${entry.mutation} :: ${entry.snippet}`;
+        if (baseline.has(sig)) ignored.push({ ...entry, reason: baseline.get(sig) });
+        else survived.push(entry);
+      } else killed++;
     }
   } finally {
     writeFileSync(srcPath, original);   // restore on a normal finish or a thrown error
@@ -101,8 +137,9 @@ export function runMutations(srcPath, opts = {}) {
     capped: capped ? all.length : false,
     killed,
     survived,
+    ignored,                                   // reviewed-equivalent survivors, with reasons — not theatre
     score: all.length ? Math.round((killed / all.length) * 1000) / 1000 : 1,
-    clean: survived.length === 0,
+    clean: survived.length === 0,              // clean = no UNREVIEWED survivors (ignored don't count)
   };
 }
 
@@ -140,18 +177,21 @@ async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === 'mutate') {
     const [srcPath] = rest;
-    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N] [--test <cmd...>]'); process.exit(2); }
+    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N] [--baseline <file>] [--test <cmd...>]'); process.exit(2); }
     const capArg = rest.indexOf('--cap');
     const cap = capArg !== -1 ? Number(rest[capArg + 1]) : 80;
+    const baseArg = rest.indexOf('--baseline');   // else auto-detects witness.baseline.json by the source
+    const baseline = baseArg !== -1 ? rest[baseArg + 1] : undefined;
     // Everything after `--test` is the target project's test command (put it LAST). Defaults to `npm test`,
     // so the gate can target any repo's own runner — that's what makes witness usable as a CI Action.
     const testArg = rest.indexOf('--test');
     const testCmd = testArg !== -1 && rest.length > testArg + 1 ? rest.slice(testArg + 1) : undefined;
     console.error(`mutation gate: ${srcPath}${testCmd ? ` · tests: ${testCmd.join(' ')}` : ''} …`);
-    const r = runMutations(srcPath, { cap, testCmd });
+    const r = runMutations(srcPath, { cap, testCmd, baseline });
     console.log(JSON.stringify(r, null, 2));
-    if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.`);
-    else console.error(`\n✓ all ${r.total} mutants killed — the tests actually guard the behaviour.`);
+    const ign = r.ignored.length ? `, ${r.ignored.length} reviewed-equivalent ignored` : '';
+    if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.${ign}`);
+    else console.error(`\n✓ ${r.killed}/${r.total} killed${ign} — no test-theatre.`);
     process.exit(r.clean ? 0 : 1);
   }
   if (cmd === 'fuzz') {
