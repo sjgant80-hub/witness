@@ -59,6 +59,33 @@ the parent runner and switched to the child-reporter protocol, exiting `0` even 
 scrubs that env var before spawning, and a regression test pins it. A build gate has to be hardened
 against the exact bug classes it hunts — this repo is dogfooded on itself.
 
+## Use as a GitHub Action
+
+Drop the gate into any repo's CI — it fails the build when a mutant survives (test-theatre) or a fuzzed
+function throws. Zero install: the Action ships `witness.mjs` (one zero-dep file) and runs it against your
+project's own tests.
+
+```yaml
+# .github/workflows/witness.yml
+name: witness
+on: [pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - uses: sjgant80-hub/witness@v0.1
+        with:
+          files: src/gate.mjs src/verify.mjs   # the behaviour-critical files
+          test-command: npm test               # your runner (default: npm test)
+          cap: 60                               # optional: max mutants per file
+          fuzz: src/verify.mjs:verify           # optional: module.mjs:exportName fuzz targets
+```
+
+A surviving mutant on an AI-generated PR is the point: it means a test named a behaviour it does not
+actually guard. The Action turns that into a red check before the code merges.
+
 ## Known limitation
 
 witness mutates source **text**, so an operator that appears inside a comment or string literal produces

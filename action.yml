@@ -1,0 +1,52 @@
+name: 'witness — deterministic build gate'
+description: 'Fail the build on surviving mutants (test-theatre) or hostile-input throws. No LLM, zero deps.'
+author: 'sjgant80-hub'
+branding:
+  icon: 'shield'
+  color: 'green'
+inputs:
+  files:
+    description: 'Source files to run the mutation gate on (space- or newline-separated).'
+    required: true
+  test-command:
+    description: "The target project's test command (must exit non-zero on failure). Default: npm test."
+    required: false
+    default: 'npm test'
+  cap:
+    description: 'Max mutants per file.'
+    required: false
+    default: '80'
+  fuzz:
+    description: 'Optional fuzz targets: space/newline-separated module.mjs:exportName pairs.'
+    required: false
+    default: ''
+  node-version:
+    description: 'Node version to run the gate under.'
+    required: false
+    default: '20'
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - name: mutation gate
+      shell: bash
+      run: |
+        set -e
+        for f in ${{ inputs.files }}; do
+          echo "::group::witness · mutation gate · $f"
+          node "${{ github.action_path }}/witness.mjs" mutate "$f" --cap "${{ inputs.cap }}" --test ${{ inputs.test-command }}
+          echo "::endgroup::"
+        done
+    - name: fuzz gate
+      if: ${{ inputs.fuzz != '' }}
+      shell: bash
+      run: |
+        set -e
+        for pair in ${{ inputs.fuzz }}; do
+          mod="${pair%%:*}"; fn="${pair##*:}"
+          echo "::group::witness · fuzz gate · $mod :: $fn"
+          node "${{ github.action_path }}/witness.mjs" fuzz "$mod" "$fn"
+          echo "::endgroup::"
+        done

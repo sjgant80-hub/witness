@@ -140,11 +140,15 @@ async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === 'mutate') {
     const [srcPath] = rest;
-    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N]'); process.exit(2); }
+    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N] [--test <cmd...>]'); process.exit(2); }
     const capArg = rest.indexOf('--cap');
     const cap = capArg !== -1 ? Number(rest[capArg + 1]) : 80;
-    console.error(`mutation gate: ${srcPath} …`);
-    const r = runMutations(srcPath, { cap });
+    // Everything after `--test` is the target project's test command (put it LAST). Defaults to `npm test`,
+    // so the gate can target any repo's own runner — that's what makes witness usable as a CI Action.
+    const testArg = rest.indexOf('--test');
+    const testCmd = testArg !== -1 && rest.length > testArg + 1 ? rest.slice(testArg + 1) : undefined;
+    console.error(`mutation gate: ${srcPath}${testCmd ? ` · tests: ${testCmd.join(' ')}` : ''} …`);
+    const r = runMutations(srcPath, { cap, testCmd });
     console.log(JSON.stringify(r, null, 2));
     if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.`);
     else console.error(`\n✓ all ${r.total} mutants killed — the tests actually guard the behaviour.`);

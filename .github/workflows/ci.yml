@@ -9,3 +9,15 @@ jobs:
         with:
           node-version: '20'
       - run: npm test
+
+  action-dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Run witness's own composite Action against a known-good fixture: the boundary mutant must be
+      # killed, so the gate is clean and this job passes. Proves the Action works end-to-end.
+      - name: witness gate (self, via the Action)
+        uses: ./
+        with:
+          files: fixtures/boundary.mjs
+          test-command: node --test fixtures/boundary.good.test.mjs
