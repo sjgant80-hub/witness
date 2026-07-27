@@ -101,13 +101,44 @@ Discovered while dogfooding: `witness` mutates the source under test and restore
 Any tool that edits files in place must **self-heal**: drop a durable sidecar before mutating and restore
 from it on the next run. `finally` is for the happy path and thrown errors, not for `kill -9`.
 
+## Non-masking — a stable part can never carry a runaway part
+A composite is only as sound as its **weakest** part. A clean `main` that imports a broken sub-module used
+to pass konomify — the stable half masked the runaway half (the same class as a vacuous payload-hash, or a
+green test suite over dead code: a fault hiding inside a passing aggregate). **Gate every part
+independently, not the sum**, and short-circuit on the first runaway: one un-witnessed sub-part fails the
+whole, however clean the rest. An untested behavioural module is itself un-witnessed and therefore a
+runaway — test it or baseline it. The tell that you're masking: your check reads an aggregate score when it
+should read the per-part worst. (`konomify` v0.3 gates all modules; `foldsig` makes it a format guarantee.)
+
+## Witness-native-before-autonomy — the gate goes inside, before self-propulsion
+Applies to any tool that will run on its own (the autonomous estate-runner, a self-scheduling agent). Once
+a thing self-propels — mints its own next step, acts without a human in the loop — nothing *external* can
+gate work it produces faster than the gate can run. So the deterministic gate (`witness`/`konomify`) must
+be **native to the loop and a hard precondition before autonomy is switched on**, never bolted on after.
+Witness-first, then self-propel. A forge that self-propels without an internal witness is polonium by
+construction — it authors faster than it can check itself.
+
+## Guide, don't force — make the correct path the cheapest path
+The one transferable idea from the entropy-gradient reading, stripped of the physics claims: don't fight the
+gradient, **reshape the landscape so the right outcome is the path of least resistance**. In tooling: if
+passing the gate is more friction than skipping it, people skip it. Make witness one CI line, konomify one
+command, the baseline auto-detected, the scaffold a template — so the witnessed, safe path is the *easy*
+one. You enforce quality far more by lowering the cost of doing it right than by policing the wrong.
+
+## Compose-first — you re-fold, you don't author
+New tools are compositions of **verified existing** ones, not creations from scratch — `Kᵢ = Φ[⊕Kⱼ]`. This
+is konomify's whole philosophy (metabolise existing organs) and it is what keeps the estate compounding
+instead of sprawling. Import the shared primitive (`fallhardened`); graft the witnessed organ; breed two
+clean cards into a child. **Non-masking is what makes composition safe** — compose only verified parts, and
+the composite inherits their soundness rather than hiding their faults.
+
 ---
 
 ## The pre-push checklist (all deterministic, all seconds)
 
 ```bash
 npm test                                  # 1. the suite is green
-npx witness mutate <each source file>     # 2. no surviving mutants (no test-theatre)
+npx witness mutate <EVERY source file>    # 2. no surviving mutants — gate every module, not just main
 npx witness fuzz <module> <tolerant fn>   # 3. tolerant fns show neverThrows:true
 ```
 
