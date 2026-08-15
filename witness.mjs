@@ -37,11 +37,33 @@ function loadBaseline(opts, srcPath, cwd) {
     }
   }
   const sigs = new Map();
+  const rejected = [];
   for (const e of (Array.isArray(raw) ? raw : [])) {
-    if (e && e.mutation && e.snippet) sigs.set(`${e.mutation} :: ${e.snippet}`, e.reason || 'reviewed-equivalent');
+    if (!e || !e.mutation || !e.snippet) continue;
+    const sig = `${e.mutation} :: ${e.snippet}`;
+    const reason = typeof e.reason === 'string' ? e.reason.trim() : '';
+    // ⚑ AN EXEMPTION MUST BE A REASON. This used to read `e.reason || 'reviewed-equivalent'`, which
+    // admitted an entry carrying no reason at all and then FABRICATED the sign-off — the report said
+    // "reviewed-equivalent" and no human had reviewed anything. A genuinely surviving mutant, real
+    // test-theatre, went to `ignored`, `clean` came back true and the process exited 0. And it needed
+    // no flag: the loader auto-detects witness.baseline.json beside the source.
+    //
+    // The bar is a sentence somebody could argue with. Below that it is a shrug, and a shrug is how
+    // a gate is talked out of its own verdict. A rejected entry is NOT exempt — the mutant counts as
+    // the survivor it is — and it is reported, because silently dropping it is the same bug wearing
+    // the other face.
+    if (reason.length < MIN_REASON_CHARS) {
+      rejected.push({ ...e, why: reason ? `reason is ${reason.length} characters; an exemption needs at least ${MIN_REASON_CHARS}` : 'no reason given' });
+      continue;
+    }
+    sigs.set(sig, reason);
   }
-  return sigs;
+  return { sigs, rejected };
 }
+
+// An exemption shorter than this is not an argument. The estate's own rule: under twenty characters
+// is a shrug, not an excuse.
+export const MIN_REASON_CHARS = 20;
 
 // A child test runner must not inherit OUR test-runner context. node:test sets NODE_TEST_CONTEXT in
 // every test-file process; if the `node --test` we spawn inherits it, it switches to the child-reporter
@@ -105,7 +127,19 @@ export function runMutations(srcPath, opts = {}) {
   // the loop never exits). Without a bound, one such mutant hangs the whole gate forever — this actually
   // happened sweeping fallherd. A timed-out run is a mutant the suite could NOT survive, i.e. KILLED.
   const timeout = opts.timeout ?? 20000;
-  const baseline = loadBaseline(opts, srcPath, cwd);
+  const { sigs: baseline, rejected: rejectedExemptions } = loadBaseline(opts, srcPath, cwd);
+
+  // BASELINE-GREEN GUARD. If the UNMUTATED suite does not already pass, every mutant will also "fail" and be
+  // counted as KILLED — a false clean. This is exactly how a missing package.json (npm test errors) or a
+  // broken generated test silently produced a green verdict. Refuse to gate a red baseline.
+  {
+    const base = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26, timeout });
+    if (base.status !== 0) {
+      if (existsSync(backup)) rmSync(backup);
+      return { total: 0, capped: false, killed: 0, survived: [], ignored: [], score: 0, clean: false,
+        baselineFailed: true, reason: 'the unmutated test suite does not pass — cannot gate (a red baseline makes every mutant look killed)' };
+    }
+  }
 
   let all = mutants(original);
   const capped = all.length > cap;
@@ -138,6 +172,10 @@ export function runMutations(srcPath, opts = {}) {
     killed,
     survived,
     ignored,                                   // reviewed-equivalent survivors, with reasons — not theatre
+    // ⚑ Entries the baseline REFUSED, reported rather than dropped. An exemption that quietly failed
+    // to apply looks exactly like one that was never written, and the mutant it named is now counted
+    // as the survivor it always was.
+    rejectedExemptions,
     score: all.length ? Math.round((killed / all.length) * 1000) / 1000 : 1,
     clean: survived.length === 0,              // clean = no UNREVIEWED survivors (ignored don't count)
   };
@@ -177,19 +215,40 @@ async function main() {
   const [cmd, ...rest] = process.argv.slice(2);
   if (cmd === 'mutate') {
     const [srcPath] = rest;
-    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N] [--baseline <file>] [--test <cmd...>]'); process.exit(2); }
+    if (!srcPath) { console.error('usage: witness mutate <sourceFile> [--cap N] [--timeout MS] [--baseline <file>] [--test <cmd...>]'); process.exit(2); }
     const capArg = rest.indexOf('--cap');
     const cap = capArg !== -1 ? Number(rest[capArg + 1]) : 80;
     const baseArg = rest.indexOf('--baseline');   // else auto-detects witness.baseline.json by the source
     const baseline = baseArg !== -1 ? rest[baseArg + 1] : undefined;
+
+    // ⚑ The per-run bound was fixed at 20s and unreachable from the command line, which meant witness
+    // could not gate ANY project whose suite honestly takes longer — and the failure was silent in the
+    // worst possible way. A timed-out run counts as KILLED, so a suite that is always too slow scores
+    // a perfect 100% having proved nothing. Worse, on Windows the killed subprocess tree orphans; the
+    // orphans slow the next run, which then also times out. A repository with real filesystem fixtures
+    // walked straight into that: 16s typical, 37s under load, against a 20s wall.
+    //
+    // Must be given BEFORE --test, because --test deliberately swallows everything after it.
+    const toArg = rest.indexOf('--timeout');
+    const timeout = toArg !== -1 && toArg < (rest.indexOf('--test') === -1 ? Infinity : rest.indexOf('--test'))
+      ? Number(rest[toArg + 1]) : undefined;
+    if (toArg !== -1 && !(timeout > 0)) {
+      console.error('witness: --timeout wants a positive number of milliseconds, and must come before --test');
+      process.exit(2);
+    }
     // Everything after `--test` is the target project's test command (put it LAST). Defaults to `npm test`,
     // so the gate can target any repo's own runner — that's what makes witness usable as a CI Action.
     const testArg = rest.indexOf('--test');
     const testCmd = testArg !== -1 && rest.length > testArg + 1 ? rest.slice(testArg + 1) : undefined;
     console.error(`mutation gate: ${srcPath}${testCmd ? ` · tests: ${testCmd.join(' ')}` : ''} …`);
-    const r = runMutations(srcPath, { cap, testCmd, baseline });
+    const r = runMutations(srcPath, { cap, testCmd, baseline, timeout });
     console.log(JSON.stringify(r, null, 2));
     const ign = r.ignored.length ? `, ${r.ignored.length} reviewed-equivalent ignored` : '';
+    // ⚑ Say it out loud. A refused exemption that nobody mentions looks exactly like one that was
+    // never written, and the author goes on believing the mutant is excused.
+    for (const x of (r.rejectedExemptions || [])) {
+      console.error(`  ⚑ baseline entry REFUSED (${x.why}) — this mutant counts as a survivor: ${x.mutation} :: ${String(x.snippet).slice(0, 70)}`);
+    }
     if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.${ign}`);
     else console.error(`\n✓ ${r.killed}/${r.total} killed${ign} — no test-theatre.`);
     process.exit(r.clean ? 0 : 1);
