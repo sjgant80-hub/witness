@@ -189,7 +189,10 @@ test('--test with nothing after it falls back to npm test, never to an empty com
   // was assembled and announced.
   const dir = project();
   const r = runCli(['mutate', 'src.mjs', '--cap', '1', '--test'], dir);
-  assert.doesNotMatch(r.err, /tests: *(\r?\n|$)/, 'an empty test command was assembled and announced');
+  // ⚑ This asserted `tests:` was not followed by end-of-line — but the announcement ends with " …",
+  // so an EMPTY command printed "· tests:  …" and sailed past. The mutant survived the gate because
+  // of that. What is actually meant is that no test-command suffix is announced at all.
+  assert.doesNotMatch(r.err, /· tests:/, 'an empty test command was assembled and announced');
   assert.doesNotMatch(r.err, /NOTHING WAS TESTED/, 'the gate found nothing to mutate');
   assert.match(r.err, /mutation gate: src\.mjs/);
   rmSync(dir, { recursive: true, force: true });
@@ -381,6 +384,142 @@ test('reapTree refuses to signal anything it does not own', () => {
     assert.equal(reapTree(999999, false), false, 'a non-detached child has no group of its own to kill');
   }
   assert.ok(alive(process.pid), 'witness survived its own reaper');
+});
+
+// ── the comment scanner's remaining decisions ────────────────────────────────────
+// Each of these survived the self-gate. They survived because the existing tests happened to produce
+// the same mutant COUNT either way — the scanner went wrong somewhere the count could not see. The
+// fix in every case is a sample where being wrong changes what is offered for mutation.
+
+test('a lone slash does not open a block comment', () => {
+  // `c === '/' && d === '*'` collapsed to `||` makes any slash — or any star — start a block
+  // comment, and with no closing marker the mask runs to end of file, hiding everything after a
+  // division from the gate.
+  const src = 'const r = a / b;\nconst live = c === d;';
+  assert.deepEqual(mutants(src).map(m => m.from), ['===']);
+  const withStar = 'const r = a * b;\nconst live = c === d;';
+  assert.deepEqual(mutants(withStar).map(m => m.from), ['===']);
+});
+
+test('a comment marker inside a string cannot hide code on the SAME line', () => {
+  // The earlier test put the live operator on the next line, so masking to end-of-line changed
+  // nothing and the mutant survived. Keep the operator on the line the string is on.
+  const src = 'const u = "http://x" + (a === b);';
+  assert.deepEqual(mutants(src).map(m => m.from), ['===']);
+});
+
+test('every quote character opens a string, not just the first one tested', () => {
+  for (const q of ['"', "'", '`']) {
+    const src = `const u = ${q}http://x${q} + (a === b);`;
+    assert.deepEqual(mutants(src).map(m => m.from), ['==='], `${q} did not open a string`);
+  }
+});
+
+test('a string ends at its own quote, not at the first character inside it', () => {
+  // Inverting the closing test ends the string immediately, so its contents are read as code and
+  // the real closing quote opens a second one that swallows what follows.
+  const src = 'const s = "a === b"; const live = c === d;';
+  assert.equal(mutants(src).length, 2, 'both the string body and the live operator are offered');
+  const after = 'const s = "xx"; const live = c === d;';
+  assert.deepEqual(mutants(after).map(m => m.from), ['===']);
+});
+
+// ── the rest of the command line ─────────────────────────────────────────────────
+// --timeout and --test had tests; --cap, --baseline, the fuzz subcommand and the refused-exemption
+// report did not, and all of them survived. Every one is an argument the gate acts on.
+
+test('--cap is read, and bounds the run', () => {
+  const dir = project();
+  writeFileSync(join(dir, 'many.mjs'),
+    'export const a = (x, y) => x > y;\nexport const b = (x, y) => x < y;\nexport const c = (x, y) => x === y;\n');
+  const r = runCli(['mutate', 'many.mjs', '--cap', '2', '--test', 'node', '-e', '0'], dir);
+  const out = JSON.parse(r.out);
+  assert.equal(out.total, 2, '--cap was not read, or was read from the wrong position');
+  assert.equal(out.capped, 2);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('--baseline is read from the path given, not guessed', () => {
+  const dir = project();
+  const ms = mutants(readFileSync(join(dir, 'src.mjs'), 'utf8'));
+  const entry = [{
+    mutation: `${ms[0].from} → ${ms[0].to}`,
+    snippet: 'export const gt = (a, b) => a > b;',
+    reason: 'the fixture has no assertions at all, so this survivor is expected and named here on purpose',
+  }];
+  writeFileSync(join(dir, 'my-baseline.json'), JSON.stringify(entry));
+  const r = runCli(['mutate', 'src.mjs', '--baseline', 'my-baseline.json', '--test', 'node', '-e', '0'], dir);
+  const out = JSON.parse(r.out);
+  assert.equal(out.ignored.length, 1, 'the named baseline file was not loaded');
+  assert.equal(out.survived.length, 0);
+  assert.equal(r.code, 0, 'a fully-exempted run is clean');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a REFUSED baseline entry is announced and still counts as a survivor', () => {
+  const dir = project();
+  const ms = mutants(readFileSync(join(dir, 'src.mjs'), 'utf8'));
+  writeFileSync(join(dir, 'my-baseline.json'), JSON.stringify([{
+    mutation: `${ms[0].from} → ${ms[0].to}`,
+    snippet: 'export const gt = (a, b) => a > b;',
+    reason: 'too short',
+  }]));
+  const r = runCli(['mutate', 'src.mjs', '--baseline', 'my-baseline.json', '--test', 'node', '-e', '0'], dir);
+  assert.match(r.err, /baseline entry REFUSED/, 'a refused exemption was swallowed');
+  assert.equal(JSON.parse(r.out).survived.length, 1, 'and the mutant it named must count against clean');
+  assert.notEqual(r.code, 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the fuzz subcommand runs, and passes a guarded function', () => {
+  const dir = project();
+  writeFileSync(join(dir, 'safe.mjs'), 'export function safe(x) { try { return String(x).length; } catch { return 0; } }\n');
+  const r = runCli(['fuzz', 'safe.mjs', 'safe'], dir);
+  assert.equal(r.code, 0, 'a never-throwing function was reported as throwing');
+  assert.equal(JSON.parse(r.out).neverThrows, true);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the fuzz subcommand fails a function that throws on hostile input', () => {
+  const dir = project();
+  writeFileSync(join(dir, 'brittle.mjs'), 'export function brittle(x) { return x.length; }\n');
+  const r = runCli(['fuzz', 'brittle.mjs', 'brittle'], dir);
+  assert.notEqual(r.code, 0);
+  assert.equal(JSON.parse(r.out).neverThrows, false);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('fuzz refuses a missing argument, and a name that is not a function', () => {
+  const dir = project();
+  writeFileSync(join(dir, 'safe.mjs'), 'export const notAFunction = 42;\n');
+  assert.equal(runCli(['fuzz'], dir).code, 2);
+  assert.equal(runCli(['fuzz', 'safe.mjs'], dir).code, 2);
+  const bad = runCli(['fuzz', 'safe.mjs', 'notAFunction'], dir);
+  assert.equal(bad.code, 2);
+  assert.match(bad.err, /not an exported function/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('an unknown command and a missing source file both explain themselves', () => {
+  const dir = project();
+  const unknown = runCli(['wibble'], dir);
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.err, /deterministic build gate/);
+  const noSrc = runCli(['mutate'], dir);
+  assert.equal(noSrc.code, 2);
+  assert.match(noSrc.err, /usage: witness mutate/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('an error report survives a value whose message cannot be read', () => {
+  // fuzz stringifies whatever was thrown. A thrown null, or an object whose .message getter itself
+  // throws, must not take the reporter down with it — the report is the only record of the failure.
+  const hostile = () => { throw null; };
+  return fuzz(hostile).then((r) => {
+    assert.equal(r.neverThrows, false);
+    assert.ok(r.throwsOn.length > 0, 'a thrown null produced no report');
+    assert.ok(r.throwsOn.every(t => typeof t.error === 'string'), 'every report must carry a string');
+  });
 });
 
 test('the operator set never mis-hits an arrow function or shift', () => {
