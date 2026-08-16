@@ -135,6 +135,16 @@ stops applying the instant that line changes. **You cannot baseline away a futur
   witness times the baseline and refuses when the bound is under `2 ×` an honest run, naming the
   value to pass instead. ⚑ This repo's own suite takes ~2 minutes; against the 20s default it would
   have reported a perfect score from a run in which no test ever completed.
+- **A run leaves nothing behind** — the bound is enforced by `runner.mjs`, a supervisor that holds
+  the child handle and kills the whole tree while it is still the ancestor. ⚑ `spawnSync`'s own
+  timeout signals only the process it started, and that is almost never the one working: `npm test`
+  spawns `sh`, which spawns `node`. Killing npm left the grandchildren running. Gating this file on
+  a Linux runner leaked **324 processes** and the job was SIGTERMed at 75 minutes without ever
+  printing a score; locally it left **301** node processes alive and turned a 3-hour run into a
+  5-hour one. Orphans slow the machine, slow runs hit the wall, and a timed-out run orphans more —
+  it compounds. With the sweep in place this repo's own suite went from 122s to 58s and leaks
+  nothing. (The estate had this recorded as a Windows quirk. It is not — the runner that died was
+  Linux; only the *repair* differs by platform.)
 - **The backup is written atomically** — it is what a killed run recovers from, and a half-written
   one is worse than none because the recovery applies it. ⚑ A truncated backup used to be copied
   straight over the source: the recovery path was the corruption path. An empty backup is now

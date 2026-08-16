@@ -29,6 +29,12 @@ jobs:
       - name: witness gates itself
         run: node witness.mjs mutate witness.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs
 
+      # runner.mjs enforces the bound and kills the tree. It is small, but it is the piece that
+      # decides whether a run is counted KILLED — gating everything except the thing holding the
+      # stopwatch would be the same "gate the edges" gap this job was added to close.
+      - name: and gates its runner
+        run: node witness.mjs mutate runner.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs
+
   action-dogfood:
     runs-on: ubuntu-latest
     steps:

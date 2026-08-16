@@ -30,6 +30,13 @@ next to the source (or in `cwd`) is auto-loaded.
    sidecar on disk is either absent or complete. On the next run, a backup that is EMPTY while the
    source is not is refused rather than restored — restoring it would destroy the file the sidecar
    exists to protect.
+3d. Every run of `testCmd` — the baseline and each mutant — goes through `runner.mjs <timeoutMs>
+   <cmd...>`, a supervisor that spawns the command (POSIX: `detached`, so it leads its own process
+   group), enforces the bound itself, and kills the whole tree before exiting: `kill(-pgid)` on
+   POSIX, `taskkill /T /F` on Windows. It exits `124` on timeout, else the child's own code.
+   The parent cannot do this itself: by the time a blocking call returns, the process it killed is
+   already gone and with it every link to the rest of the tree. `spawnSync` keeps a larger bound as
+   a backstop, and `reapTree()` sweeps once more after each run.
 4. For each mutant: write it to `srcPath`, run `testCmd` under `timeout` (child env has
    `NODE_TEST_CONTEXT` scrubbed).
    - child exit `0` ⇒ tests passed ⇒ mutant survived (candidate test-theatre) → checked against the baseline.

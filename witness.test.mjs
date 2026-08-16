@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM } from './witness.mjs';
+import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree } from './witness.mjs';
 
 const SRC = 'fixtures/boundary.mjs';
 const nodeTest = f => ['node', '--test', f];
@@ -310,6 +310,77 @@ test('a run with room to spare is not refused', () => {
   assert.equal(r.total, 1);
   assert.ok(Number.isFinite(r.baselineMs) === false || r.baselineMs >= 0);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ── a timeout must kill the tree, not just the child it started ──────────────────
+// spawnSync's `timeout` signals the process it started, and that process is almost never the one
+// doing the work: `npm test` spawns `sh`, which spawns `node`. Killing npm left the grandchildren
+// running. Gating this file on a GitHub runner leaked 324 processes and the job was SIGTERMed at 75
+// minutes without ever printing a score; the same leak locally left 301 node processes alive and
+// turned a 3-hour run into a 5-hour one. Orphans slow the machine, slow runs hit the wall, and a
+// timed-out run orphans more — it compounds.
+
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
+/** A suite that starts a long-lived grandchild, records its pid, then hangs past the bound. */
+function leakyProject(hang) {
+  const dir = mkdtempSync(join(tmpdir(), 'witness-orphan-'));
+  writeFileSync(join(dir, 'src.mjs'), 'export const gt = (a, b) => a > b;\n');
+  writeFileSync(join(dir, 'suite.mjs'), [
+    "import { spawn } from 'node:child_process';",
+    "import { writeFileSync } from 'node:fs';",
+    // a grandchild that would outlive its parent forever if nobody reaped it
+    "const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+    "writeFileSync(process.env.PID_FILE, String(kid.pid));",
+    hang ? "setInterval(() => {}, 1000);" : "setTimeout(() => process.exit(0), 150);",
+  ].join('\n'));
+  return { dir, pidFile: join(dir, 'kid.pid') };
+}
+
+test('a timed-out run leaves no orphaned grandchild behind', () => {
+  const { dir, pidFile } = leakyProject(true);
+  const prev = process.env.PID_FILE;
+  process.env.PID_FILE = pidFile;
+  try {
+    // The suite hangs, so the run hits the bound. Before the fix the grandchild survived that kill.
+    runMutations(join(dir, 'src.mjs'), { testCmd: ['node', join(dir, 'suite.mjs')], cap: 1, timeout: 2500 });
+    const kid = Number(readFileSync(pidFile, 'utf8'));
+    assert.ok(Number.isInteger(kid) && kid > 0, 'the fixture never reported a grandchild pid');
+    assert.equal(alive(kid), false, `grandchild ${kid} outlived the run that started it`);
+  } finally {
+    if (prev === undefined) delete process.env.PID_FILE; else process.env.PID_FILE = prev;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a run that exits normally is also swept', () => {
+  // Not only timeouts: a suite can leak a daemon on its way out just as easily, and the next mutant
+  // then races it. The sweep happens after every run.
+  const { dir, pidFile } = leakyProject(false);
+  const prev = process.env.PID_FILE;
+  process.env.PID_FILE = pidFile;
+  try {
+    runMutations(join(dir, 'src.mjs'), { testCmd: ['node', join(dir, 'suite.mjs')], cap: 1, timeout: 30000 });
+    const kid = Number(readFileSync(pidFile, 'utf8'));
+    assert.equal(alive(kid), false, `grandchild ${kid} survived a clean run`);
+  } finally {
+    if (prev === undefined) delete process.env.PID_FILE; else process.env.PID_FILE = prev;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reapTree refuses to signal anything it does not own', () => {
+  // The negative-pid kill is only safe because the child was spawned detached into its own group.
+  // Without that it shares OUR group, and the same call would take witness down with it — so the
+  // function refuses rather than guessing, and never signals this process under any argument.
+  assert.equal(reapTree(process.pid, true), false, 'it would have signalled itself');
+  assert.equal(reapTree(0, true), false);
+  assert.equal(reapTree(null, true), false);
+  assert.equal(reapTree(undefined, true), false);
+  if (process.platform !== 'win32') {
+    assert.equal(reapTree(999999, false), false, 'a non-detached child has no group of its own to kill');
+  }
+  assert.ok(alive(process.pid), 'witness survived its own reaper');
 });
 
 test('the operator set never mis-hits an arrow function or shift', () => {

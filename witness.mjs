@@ -17,6 +17,7 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 // A reviewed-equivalent baseline. Mutation testing has a well-known floor: some mutants are EQUIVALENT
@@ -166,6 +167,59 @@ export function mutants(source) {
 // run was killed, that backup is still on disk and we self-heal from it on the next run. The estate can
 // never be left silently corrupted by an interrupted gate.
 // opts: { testCmd?: string[], cwd?: string, cap?: number, timeout?: number, baseline?: string|array }
+// ── run the suite once, and leave nothing behind ─────────────────────────────
+//
+// ⚑ A TIMEOUT KILLED THE CHILD AND ORPHANED ITS DESCENDANTS. spawnSync's `timeout` sends a signal to
+// the process it started — and that process is almost never the one doing the work. `npm test`
+// spawns `sh`, which spawns `node`. Kill npm and the grandchildren carry on, holding CPU, holding the
+// source file open, and racing the next mutant.
+//
+// This is not cosmetic; it is what stops a gate finishing at all. Gating this very file on a GitHub
+// runner leaked 324 processes — 164 node, 82 npm, 78 sh — and the job was SIGTERMed at 75 minutes
+// having never printed a score. The same leak locally left 301 node processes alive and turned a
+// 3-hour run into a 5-hour one: orphans slow the machine, slow runs hit the wall, timed-out runs
+// orphan more. It compounds. The estate had this written down as a Windows quirk. It is not — the
+// runner that died was Linux.
+//
+// The fix is to make the child a process-group leader (`detached`) and then kill the GROUP once the
+// run is over, whether it exited or timed out. Killing a group is only safe because of `detached`:
+// without it the child shares OUR group and a negative-pid kill would take down witness itself. So
+// the two must never be separated, which is why they live in one function and the raw spawnSync
+// calls are gone.
+// The bound is enforced by runner.mjs, a supervisor that keeps the handle and kills the tree WHILE
+// it is still the ancestor — the one moment at which the descendants are still reachable. spawnSync
+// keeps its own bound as a backstop, generously larger, for the case where the supervisor itself
+// wedges; reapTree() below is a second backstop for whatever escapes both.
+const RUNNER = join(dirname(fileURLToPath(import.meta.url)), 'runner.mjs');
+
+function runSuiteOnce(testCmd, { cwd, timeout }) {
+  const detached = process.platform !== 'win32';
+  const r = spawnSync(process.execPath, [RUNNER, String(timeout), ...testCmd], {
+    cwd, env: childEnv(), encoding: 'utf8',
+    maxBuffer: 1 << 26, timeout: timeout + 15000, detached,
+  });
+  reapTree(r.pid, detached);
+  return r;
+}
+
+// Kill anything the run left behind. Called after EVERY run, not only after a timeout: a suite can
+// leak a daemon on its way out just as easily. `catch {}` because "already gone" is the normal case
+// and the only other outcome worth a word would be a permissions failure we could not act on anyway.
+export function reapTree(pid, detached) {
+  if (!pid || pid === process.pid) return false;    // never signal ourselves
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' });
+    } else {
+      if (!detached) return false;                  // no group of our own to kill — refuse rather than guess
+      process.kill(-pid, 'SIGKILL');                // negative pid = the whole process group
+    }
+    return true;
+  } catch {
+    return false;                                   // the group had already gone, which is the good case
+  }
+}
+
 // Is the per-mutant bound comfortably above an honest run of the suite? Only a mutant that genuinely
 // hangs should ever reach the wall; if a NORMAL run is anywhere near it, every mutant times out, each
 // timeout counts as KILLED, and the gate scores a perfect clean having finished nothing.
@@ -234,7 +288,7 @@ export function runMutations(srcPath, opts = {}) {
   // broken generated test silently produced a green verdict. Refuse to gate a red baseline.
   {
     const started = Date.now();
-    const base = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26, timeout });
+    const base = runSuiteOnce(testCmd, { cwd, timeout });
     const baselineMs = Date.now() - started;
     if (base.status !== 0) {
       if (existsSync(backup)) rmSync(backup);
@@ -270,7 +324,7 @@ export function runMutations(srcPath, opts = {}) {
   try {
     for (const m of all) {
       writeFileSync(srcPath, m.source);
-      const r = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26, timeout });
+      const r = runSuiteOnce(testCmd, { cwd, timeout });
       // Killed unless the tests genuinely PASSED. status 0 = passed ⇒ survived. A timeout kills the child
       // (status null, signal set) ⇒ not passed ⇒ killed, which is correct: a mutant that hangs is caught.
       const passed = r.status === 0;
