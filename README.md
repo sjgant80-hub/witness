@@ -90,8 +90,23 @@ actually guard. The Action turns that into a red check before the code merges.
 
 Two kinds of survivor are *not* test-theatre and can never be killed:
 
-- **False positives** — the operator sits inside a `//` comment or a string literal, so the flip changes
-  no behaviour. Read the snippet; if it's in a comment or string, dismiss it.
+- **False positives** — the operator sits inside a **string literal**, so the flip may change no
+  behaviour anybody can observe. Read the snippet before believing it.
+
+  ⚑ Comments used to be in that list, and the advice was "dismiss it". That was the tool documenting
+  its own defect as your chore. An operator in a comment cannot be killed by any test, because
+  changing it changes nothing — so it ALWAYS survived, and a file was reported as test-theatre
+  because of a sentence somebody wrote *about* the code. It bit seven repositories in this estate,
+  always the same way: a comment explaining a defect quotes the offending expression, and the
+  quotation becomes an unkillable survivor. That left two exits — delete the explanation, or baseline
+  the mutant — and the second one trains people to talk the gate out of its verdict, which is the
+  exact door `MIN_REASON_CHARS` exists to shut. **An instrument that produces failures nobody can fix
+  teaches people to ignore it.** Since v0.4, comments are excluded when mutants are generated.
+
+  String literals are deliberately NOT excluded. Mutating inside a string really does change the
+  program — an error message gets asserted on, a pattern gets compiled — so a surviving string mutant
+  is weak evidence, but it is evidence. A comment mutant is not evidence of anything, and that is a
+  fact about the language rather than a judgement call.
 - **Equivalent mutants** — the mutation is semantically identical to the original (an idempotent
   `max`-assignment, an out-of-bounds write a typed array silently drops, a tie-break branch that's
   unreachable because ids are unique). No test can distinguish them. This is mutation testing's known floor.
@@ -111,6 +126,22 @@ stops applying the instant that line changes. **You cannot baseline away a futur
 
 ## Design
 
+- **A run that mutated nothing is not a pass** — a file with no mutable operator returns
+  `clean: false`, `score: null`, `noMutants: true`, and the CLI exits non-zero. ⚑ It used to score
+  1.0 and report clean, so a mistyped path, a README, or a config file produced a flawless green
+  from a gate that tested nothing.
+- **The bound must leave room for the suite** — a timed-out run counts as KILLED, so a suite slower
+  than `--timeout` makes *every* mutant time out and the gate scores 100% having finished nothing.
+  witness times the baseline and refuses when the bound is under `2 ×` an honest run, naming the
+  value to pass instead. ⚑ This repo's own suite takes ~2 minutes; against the 20s default it would
+  have reported a perfect score from a run in which no test ever completed.
+- **The backup is written atomically** — it is what a killed run recovers from, and a half-written
+  one is worse than none because the recovery applies it. ⚑ A truncated backup used to be copied
+  straight over the source: the recovery path was the corruption path. An empty backup is now
+  refused with an explanation rather than restored.
+- **Comments are not code** — `commentMask()` scans the source (rather than regexing it, because `//`
+  inside a string and an apostrophe inside prose both defeat a regex, and a masker that gets those
+  wrong hides real code instead of noise) and no mutant is generated inside a comment.
 - **Spaced operators only** (`' > '`, not `'>'`) so mutation never mis-hits `=>`, `>=` inside `===`, or a
   bit-shift.
 - **Single-point mutations** — one operator flipped per mutant, so a surviving mutant names an exact line.

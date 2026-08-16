@@ -15,7 +15,7 @@
 // per build. Zero dependencies (Node only — spawns the project's own test runner). Deterministic.
 // ════════════════════════════════════════════════════════════════
 
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -86,15 +86,71 @@ export const OPERATORS = [
   [' + 1', ' - 1'], [' - 1', ' + 1'],
 ];
 
-// Generate one mutant per operator occurrence (single-point mutation).
+// ── comments are not code, and a comment mutant is not a mutant ──────────────
+//
+// ⚑ Every offset in the file was fair game, comments included. Rewriting `===` to `!==` inside a
+// `//` line changes no behaviour whatsoever, so no test can possibly kill it — the "mutant" ALWAYS
+// survives, and witness reports the file as test-theatre on the strength of a sentence somebody
+// wrote about the code.
+//
+// That is not a cosmetic annoyance. It has bitten seven repositories in this estate, always the
+// same way: a comment explaining a defect quotes the offending expression, and the quotation
+// becomes an unkillable survivor. The gate then says THEATRE about a suite that is fine, which
+// leaves two exits — delete the explanation, or baseline the mutant. Both are worse than the
+// problem, and the second one trains people to talk the gate out of its verdict, which is the exact
+// door MIN_REASON_CHARS above exists to shut. **An instrument that produces failures nobody can fix
+// teaches people to ignore it.**
+//
+// String literals are deliberately NOT skipped. Mutating inside a string really does change the
+// program — an error message can be asserted on, a pattern can be compiled — so a surviving string
+// mutant is weak evidence but it is still evidence. A comment mutant is not evidence of anything,
+// and that is a fact about the language, not a judgement call.
+//
+// Scanned rather than regexed, because `//` inside a string and a quote inside a comment both defeat
+// a regex, and a masker that gets those wrong hides real code instead.
+export function commentMask(source) {
+  const src = String(source ?? '');
+  const mask = new Uint8Array(src.length);
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i], d = src[i + 1];
+    if (c === '/' && d === '/') {
+      while (i < src.length && src[i] !== '\n') mask[i++] = 1;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      const end = src.indexOf('*/', i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      while (i < stop) mask[i++] = 1;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      const quote = c;
+      i += 1;
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === quote) { i += 1; break; }
+        i += 1;
+      }
+      continue;
+    }
+    i += 1;
+  }
+  return mask;
+}
+
+// Generate one mutant per operator occurrence (single-point mutation), skipping comment text.
 export function mutants(source) {
   const out = [];
+  const inComment = commentMask(source);
   for (const [from, to] of OPERATORS) {
     let idx = source.indexOf(from);
     while (idx !== -1) {
-      const mutated = source.slice(0, idx) + to + source.slice(idx + from.length);
-      const line = source.slice(0, idx).split('\n').length;
-      out.push({ line, from: from.trim(), to: to.trim(), pos: idx, source: mutated });
+      if (!inComment[idx]) {
+        const mutated = source.slice(0, idx) + to + source.slice(idx + from.length);
+        const line = source.slice(0, idx).split('\n').length;
+        out.push({ line, from: from.trim(), to: to.trim(), pos: idx, source: mutated });
+      }
       idx = source.indexOf(from, idx + from.length);
     }
   }
@@ -110,16 +166,60 @@ export function mutants(source) {
 // run was killed, that backup is still on disk and we self-heal from it on the next run. The estate can
 // never be left silently corrupted by an interrupted gate.
 // opts: { testCmd?: string[], cwd?: string, cap?: number, timeout?: number, baseline?: string|array }
+// Is the per-mutant bound comfortably above an honest run of the suite? Only a mutant that genuinely
+// hangs should ever reach the wall; if a NORMAL run is anywhere near it, every mutant times out, each
+// timeout counts as KILLED, and the gate scores a perfect clean having finished nothing.
+//
+// Pulled out as a pure function on purpose. Testing it through a real subprocess means engineering a
+// suite whose duration lands in a factor-of-two window, which is a coin toss on a loaded machine —
+// so the decision is checked exactly here, and the wiring is checked loosely.
+export const BOUND_HEADROOM = 2;
+export function boundIsAdequate(baselineMs, timeout) {
+  if (!Number.isFinite(baselineMs) || !Number.isFinite(timeout)) return false;
+  return baselineMs * BOUND_HEADROOM <= timeout;
+}
+
+// The backup is the one file that must never be half-written: it is what a killed run recovers from,
+// and a truncated one is worse than none because the recovery applies it. Written to a temp name and
+// renamed, so on disk it either does not exist or is complete.
+function writeBackupAtomically(backup, contents) {
+  const tmp = backup + '.tmp';
+  writeFileSync(tmp, contents);
+  renameSync(tmp, backup);        // atomic on POSIX and on Windows for a same-directory rename
+}
+
 export function runMutations(srcPath, opts = {}) {
   const backup = srcPath + '.witnessbak';
   // Self-heal: a leftover backup means a previous run was hard-killed with srcPath mutated. The backup
   // holds the real original — restore from it before reading, so a crash never poisons the next run.
+  //
+  // ⚑ THE RECOVERY PATH WAS THE CORRUPTION PATH. This restored from the backup unconditionally, and
+  // the backup used to be written with a plain writeFileSync — which is not atomic. A hard kill
+  // DURING that write is the exact scenario this mechanism exists for, and it leaves a TRUNCATED
+  // backup on disk. The next run then dutifully copied that truncation over the real source. An empty
+  // backup emptied the file. It happened to this repo's own fixture, and the run that did it went on
+  // to report a clean gate, because a file with nothing in it has no mutants and no mutants used to
+  // score 1.0 (see below). "The estate can never be left silently corrupted by an interrupted gate"
+  // was the promise directly above this line.
+  //
+  // Two changes. The backup is now written atomically — to a temp file, then renamed, so it either
+  // does not exist or is complete. And a backup that is EMPTY while the source is not is refused
+  // rather than applied: it is not a recovery, it is a loss, and the operator is told so instead of
+  // being handed a green.
   if (existsSync(backup)) {
-    writeFileSync(srcPath, readFileSync(backup, 'utf8'));
+    const saved = readFileSync(backup, 'utf8');
+    const current = existsSync(srcPath) ? readFileSync(srcPath, 'utf8') : '';
+    if (saved === '' && current !== '') {
+      throw new Error(
+        `witness: ${backup} is empty, which means a previous run was killed while writing it. ` +
+        `Restoring from it would destroy ${srcPath}. Delete the backup once you have confirmed ` +
+        `${srcPath} is the source you want, then run again.`);
+    }
+    writeFileSync(srcPath, saved);
     rmSync(backup);
   }
   const original = readFileSync(srcPath, 'utf8');
-  writeFileSync(backup, original);   // durable copy of truth, survives even a SIGKILL of this process
+  writeBackupAtomically(backup, original);   // durable copy of truth, survives even a SIGKILL
   const cwd = opts.cwd || process.cwd();
   const testCmd = opts.testCmd || ['npm', 'test'];
   const cap = opts.cap ?? 80;
@@ -133,11 +233,31 @@ export function runMutations(srcPath, opts = {}) {
   // counted as KILLED — a false clean. This is exactly how a missing package.json (npm test errors) or a
   // broken generated test silently produced a green verdict. Refuse to gate a red baseline.
   {
+    const started = Date.now();
     const base = spawnSync(testCmd[0], testCmd.slice(1), { cwd, env: childEnv(), encoding: 'utf8', shell: process.platform === 'win32', maxBuffer: 1 << 26, timeout });
+    const baselineMs = Date.now() - started;
     if (base.status !== 0) {
       if (existsSync(backup)) rmSync(backup);
       return { total: 0, capped: false, killed: 0, survived: [], ignored: [], score: 0, clean: false,
         baselineFailed: true, reason: 'the unmutated test suite does not pass — cannot gate (a red baseline makes every mutant look killed)' };
+    }
+    // ⚑ THE BOUND MUST BE COMFORTABLY ABOVE THE SUITE, AND NOTHING USED TO CHECK.
+    // A timed-out run counts as KILLED, which is right for a mutant that hangs and catastrophic for
+    // one that was merely slow: a suite slower than the bound makes EVERY mutant time out, so the
+    // gate scores a perfect 100% having proved nothing at all. It is the worst kind of false clean,
+    // because the number it produces is the best possible one. The estate has already been bitten:
+    // a repo with real filesystem fixtures ran 16s typical and 37s under load against a 20s wall.
+    // This file's own suite now takes ~107s, and gating it with the 20s default would have reported
+    // a flawless score from a run in which not one test ever finished.
+    // The baseline has just been timed, so the check costs nothing: refuse when the bound is not at
+    // least twice the honest run. Only a mutant that genuinely hangs should ever reach the wall.
+    if (!boundIsAdequate(baselineMs, timeout)) {
+      if (existsSync(backup)) rmSync(backup);
+      return { total: 0, capped: false, killed: 0, survived: [], ignored: [], score: 0, clean: false,
+        baselineFailed: true, baselineMs,
+        reason: `the per-mutant bound (${timeout}ms) is not comfortably above the suite's own run (${baselineMs}ms). `
+          + `Every mutant would time out and be counted KILLED, scoring a perfect clean from a gate that finished nothing. `
+          + `Pass --timeout ${Math.max(timeout, baselineMs * 3)} or faster tests.` };
     }
   }
 
@@ -176,8 +296,17 @@ export function runMutations(srcPath, opts = {}) {
     // to apply looks exactly like one that was never written, and the mutant it named is now counted
     // as the survivor it always was.
     rejectedExemptions,
-    score: all.length ? Math.round((killed / all.length) * 1000) / 1000 : 1,
-    clean: survived.length === 0,              // clean = no UNREVIEWED survivors (ignored don't count)
+    // ⚑ NO MUTANTS USED TO SCORE 1.0 AND REPORT CLEAN. A file the gate could find nothing to mutate
+    // in — a mistyped path, a README, a config, a source emptied by the recovery bug above — came
+    // back with a perfect score and a green verdict. That is the same false clean as a suite slower
+    // than the timeout: a number produced by a gate that ran nothing. An empty run proves nothing, so
+    // it says so, and CI that reads `clean` fails instead of passing.
+    score: all.length ? Math.round((killed / all.length) * 1000) / 1000 : null,
+    clean: all.length > 0 && survived.length === 0,   // clean = mutants existed AND none survived unreviewed
+    ...(all.length === 0 && {
+      noMutants: true,
+      reason: `no mutable operator found in ${srcPath} — nothing was tested, so this is not a pass. Check the path, and that the file contains spaced operators the gate knows how to flip.`,
+    }),
   };
 }
 
@@ -249,7 +378,10 @@ async function main() {
     for (const x of (r.rejectedExemptions || [])) {
       console.error(`  ⚑ baseline entry REFUSED (${x.why}) — this mutant counts as a survivor: ${x.mutation} :: ${String(x.snippet).slice(0, 70)}`);
     }
-    if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.${ign}`);
+    // A run with nothing to mutate is not a pass and must not print like one. It used to reach the
+    // ✓ branch and exit 0, so a mistyped path was indistinguishable from a gated file.
+    if (r.noMutants) console.error(`\n✗ NOTHING WAS TESTED — ${r.reason}`);
+    else if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.${ign}`);
     else console.error(`\n✓ ${r.killed}/${r.total} killed${ign} — no test-theatre.`);
     process.exit(r.clean ? 0 : 1);
   }
