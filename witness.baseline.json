@@ -1,0 +1,26 @@
+[
+  {
+    "line": 116,
+    "mutation": "< → <=",
+    "snippet": "while (i < src.length) {",
+    "reason": "Equivalent, and checked rather than argued. This is commentMask's outer loop bound. The mutant takes exactly one extra iteration, entered only when i === src.length; there src[i] and src[i+1] are both undefined, which matches none of the three branch guards (they compare against single characters), so the body falls through to i += 1 and the loop exits. No mask write is reached, and mask was allocated at src.length before the loop, so its length and every byte are untouched. The mask is the whole return value. The jump cases were checked too: where i advances by more than one (the backslash skip, the block-comment jump, the newline scan) it either lands exactly on len — the no-op iteration above — or overshoots to len+1, which fails both bounds identically. Verified by differential run: exhaustive over the alphabet the scanner branches on for all lengths 0-4 (4,681 strings), 200,000 random strings of length 5-16, and the non-string inputs. Zero differing masks."
+  },
+  {
+    "line": 119,
+    "mutation": "< → <=",
+    "snippet": "while (i < src.length && src[i] !== '\\n') mask[i++] = 1;",
+    "reason": "Equivalent, and checked rather than argued. The line-comment scanner's bound. It can only reach the mutated comparison at i === src.length, i.e. a // comment running to the very end with no trailing newline. There the mutant reads src[src.length] (undefined, which is !== '\\n', so the body runs) and executes mask[i++] = 1 with i === src.length — an integer-indexed write past the end of a Uint8Array, which is silently discarded rather than throwing or creating a property. i becomes len+1, the bound fails, and the outer loop bound fails for both versions. The write index always equals the current i, which is out of range exactly when the extra iteration happens, so it can never land in range. Verified by differential run over 23 targeted end-of-buffer fixtures plus 400,000 random strings: identical on every input."
+  },
+  {
+    "line": 131,
+    "mutation": "< → <=",
+    "snippet": "while (i < src.length) {",
+    "reason": "Equivalent, and checked rather than argued. The string-literal scanner's bound. This loop never writes to mask at all — string literals are deliberately left mutable, so it only advances i. The single divergent iteration happens on an unterminated string running to the end of the buffer, where src[src.length] is undefined and matches neither the backslash test nor the closing quote, so i becomes len+1 and both the inner and outer bounds then fail identically. The escape skip can overshoot to len+1, which also fails both. Verified by differential run: exhaustive over all 299,593 strings of length 0-6 drawn from every character the scanner branches on, comparing both the mask and the full mutants() output; plus every prefix of every file in this repo (~28,000 truncations, each leaving a different scanner state at the end of the buffer) and 200,000 random strings. Zero differences."
+  },
+  {
+    "line": 416,
+    "mutation": "< → <=",
+    "snippet": "const timeout = toArg !== -1 && toArg < (rest.indexOf('--test') === -1 ? Infinity : rest.i",
+    "reason": "Equivalent by construction. The comparison is toArg < indexOf('--test'), guarded by toArg !== -1. Inclusive versus exclusive can only change the result when toArg equals the right-hand operand. With no --test present the operand is Infinity, and toArg is an Array.indexOf result, i.e. a finite non-negative integer once -1 is excluded by the first conjunct, so equality is unreachable. With --test present the operand is indexOf('--test'), and two DIFFERENT strings cannot share an index in the same array, so toArg === that index is likewise unreachable. There is no argv, well-formed or hostile, on which the two differ."
+  }
+]

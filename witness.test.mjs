@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree } from './witness.mjs';
+import { spawn } from 'node:child_process';
 
 const SRC = 'fixtures/boundary.mjs';
 const nodeTest = f => ['node', '--test', f];
@@ -520,6 +521,91 @@ test('an error report survives a value whose message cannot be read', () => {
     assert.ok(r.throwsOn.length > 0, 'a thrown null produced no report');
     assert.ok(r.throwsOn.every(t => typeof t.error === 'string'), 'every report must carry a string');
   });
+});
+
+// ── survivors of the second self-gate ────────────────────────────────────────────
+// Four decisions the suite reached but never actually judged. Each was found by re-running the
+// reported survivors one at a time and asking, of every one that lived, whether ANY input could
+// tell mutant from original. These four could; the answer is a test, not an exemption.
+
+test('a baseline entry missing half its identity is dropped, not announced as REFUSED', () => {
+  // The malformed-entry guard is `!e || !e.mutation || !e.snippet`. Weaken either `||` and a
+  // half-formed entry — a snippet with no mutation, say — stops being skipped, falls through to the
+  // reason check, and is REPORTED AS REFUSED. That invents a verdict about a mutant the entry never
+  // named. The existing tests only ever fed it well-formed entries.
+  const dir = project();
+  writeFileSync(join(dir, 'my-baseline.json'), JSON.stringify([{ snippet: 'export const gt = (a, b) => a > b;' }]));
+  const r = runCli(['mutate', 'src.mjs', '--baseline', 'my-baseline.json', '--test', 'node', '-e', '0'], dir);
+  assert.doesNotMatch(r.err, /baseline entry REFUSED/,
+    'an entry naming no mutant was refused — a verdict about nothing');
+  writeFileSync(join(dir, 'my-baseline.json'), JSON.stringify([{ mutation: '> → >=' }]));
+  const r2 = runCli(['mutate', 'src.mjs', '--baseline', 'my-baseline.json', '--test', 'node', '-e', '0'], dir);
+  assert.doesNotMatch(r2.err, /baseline entry REFUSED/, 'and the same the other way round');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('fuzz refuses a HALF-given argument pair, with the usage line', () => {
+  // `!modulePath || !exportName` weakened to `&&` refuses only when BOTH are missing, so naming a
+  // module and omitting the export sails past the guard into the dynamic import. The old test
+  // asserted only the exit code — which is 2 either way — so it walked straight through.
+  const dir = project();
+  writeFileSync(join(dir, 'safe.mjs'), 'export const notAFunction = 42;\n');
+  const half = runCli(['fuzz', 'safe.mjs'], dir);
+  assert.equal(half.code, 2);
+  assert.match(half.err, /usage: witness fuzz/, 'it got past the guard and failed later instead');
+  const none = runCli(['fuzz'], dir);
+  assert.equal(none.code, 2);
+  assert.match(none.err, /usage: witness fuzz/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the error report carries the real message, not the shape of one', async () => {
+  // `String(e && e.message || e)` reports the message when there is one and the thrown value when
+  // there is not. Collapse the `||` and an Error reports "Error: boom" while a thrown string reports
+  // "undefined" — the report is the only record of the failure, so assert what it SAYS. Asserting
+  // merely that it is a string can never fail: String() always returns one.
+  const r = await fuzz(() => { throw new Error('boom'); });
+  assert.equal(r.throwsOn[0].error, 'boom', 'an Error must report its message');
+  const s = await fuzz(() => { throw 'disk on fire'; });
+  assert.equal(s.throwsOn[0].error, 'disk on fire', 'a thrown string IS the record');
+});
+
+test('reapTree reports whether the kill actually landed', () => {
+  // The return value is the difference between "I killed the tree" and "there was nothing to kill",
+  // and both arms were unguarded. A reaper that always claims success is one nobody can debug.
+  const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],
+    { stdio: 'ignore', detached: process.platform !== 'win32' });
+  const landed = reapTree(kid.pid, process.platform !== 'win32');
+  assert.equal(landed, true, 'killing a live process group was reported as a failure');
+
+  // A signal that THREW must come back false. Claiming a kill that never happened is the failure
+  // mode here: the sweep is the last thing standing between a killed run and a mutant left on disk,
+  // and a caller that believes a false success stops looking.
+  //
+  // Portable, deliberately. On POSIX an already-dead group makes process.kill throw ESRCH, which is
+  // the everyday case. On Windows taskkill just returns non-zero for a missing pid and nothing
+  // throws, so that branch alone would leave this arm unasserted there — and it did: the mutant
+  // survived on Windows while dying on Linux. A pid that cannot even be stringified reaches the
+  // catch on both.
+  // NB not a Symbol: String(sym) is specified to return "Symbol(x)" rather than throw, so it sails
+  // through the Windows branch and reports success. A value whose toString throws reaches the catch
+  // on both platforms — on POSIX because -pid is then NaN and process.kill rejects it.
+  const unstringifiable = { toString() { throw new TypeError('this pid cannot be read'); } };
+  assert.equal(reapTree(unstringifiable, true), false, 'a kill that threw was reported as a success');
+  if (process.platform !== 'win32') {
+    const gone = spawnSync(process.execPath, ['-e', '0']);
+    assert.equal(reapTree(gone.pid, true), false, 'reaping an already-dead group was reported as a kill');
+  }
+
+  // And it must never throw, whatever it is handed. This runs in a `finally`-shaped cleanup path;
+  // one that throws would take the gate down mid-run and leave a mutant on disk.
+  // NB the failure message must not stringify the value: one of these throws on toString, which is
+  // the whole point of including it, and building the message would throw before the assertion ran.
+  const junkValues = [Symbol('x'), unstringifiable, {}, [], 'not a pid', NaN, Infinity, -0, true];
+  for (const [i, junk] of junkValues.entries()) {
+    assert.doesNotThrow(() => reapTree(junk, true), `reapTree threw on junkValues[${i}]`);
+    assert.doesNotThrow(() => reapTree(junk, false), `reapTree threw on junkValues[${i}] undetached`);
+  }
 });
 
 test('the operator set never mis-hits an arrow function or shift', () => {
