@@ -640,6 +640,41 @@ test('⚑ the broadcast targets are refused, and asserting it sends nothing', ()
     assert.equal(isReapablePid(neg), false, 'a negative pid would become a positive kill target');
   }
 });
+// ── a regex literal is not a comment ────────────────────────────────────────────
+// ⚑ The scanner had no branch for regexes, so `/\//` was read as a line comment and `/\/*` as a
+// block comment running to the next `*/` ANYWHERE in the file — swallowing whole functions. Every
+// masked byte is skipped by mutants(), so those decisions were never offered and the gate returned
+// clean:true and score 1 on a file with live test-theatre. Worse than missing a line: clean:true is
+// an affirmative claim that the line WAS tested.
+const BSL = String.fromCharCode(92);
+
+test('a regex containing an escaped slash does not swallow the line', () => {
+  const src = `const parts = p.split(/${BSL}//g); const ok = parts.length > 0;`;
+  assert.deepEqual(mutants(src).map(m => m.from), ['>'], 'the comparison after a regex was hidden');
+});
+
+test('a regex that looks like a block comment does not swallow the file', () => {
+  const src = `const base = p.replace(/${BSL}/*$/, ""); const q = a > b;`;
+  assert.deepEqual(mutants(src).map(m => m.from), ['>']);
+});
+
+test('division is still division — the bias is never to mask real code', () => {
+  // After an identifier, a number, `)` or `]` a slash is division. Guessing "regex" there would
+  // consume real code as a pattern, which is the direction that produces a false clean.
+  assert.deepEqual(mutants('const x = a / b; const y = c > d;').map(m => m.from), ['>']);
+  assert.deepEqual(mutants('const z = (a) / 2; const w = p === q;').map(m => m.from), ['===']);
+});
+
+test('a real comment is still masked, and a string is still mutable', () => {
+  assert.deepEqual(mutants('// a real comment with a > b').map(m => m.from), []);
+  assert.deepEqual(mutants('const s = "a > b"; const live = c === d;').map(m => m.from).sort(), ['===', '>']);
+});
+
+test('a character class holding a slash does not end the regex early', () => {
+  const src = `const re = /[/]x/; const live = a > b;`;
+  assert.deepEqual(mutants(src).map(m => m.from), ['>']);
+});
+
 test('the operator set never mis-hits an arrow function or shift', () => {
   // `=>` and `>>>` must not be mutated (no spaced `>` there)
   assert.equal(mutants('const f = () => x;').length, 0);

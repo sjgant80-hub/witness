@@ -17,7 +17,7 @@
 
 import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 // A reviewed-equivalent baseline. Mutation testing has a well-known floor: some mutants are EQUIVALENT
@@ -109,12 +109,50 @@ export const OPERATORS = [
 //
 // Scanned rather than regexed, because `//` inside a string and a quote inside a comment both defeat
 // a regex, and a masker that gets those wrong hides real code instead.
+// Where a `/` begins a REGEX rather than a division. Only the unambiguous openers are listed: after
+// an identifier, a number, `)` or `]` a slash is division, and guessing wrong in THAT direction would
+// consume real code as a pattern. Missing a regex only costs a weak mutant inside it; masking real
+// code costs a false clean, so the bias is deliberate.
+const REGEX_OPENERS = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', '{', ';', '}', '+', '-', '*', '%', '^', '~', '<', '>']);
+function regexAllowed(prevCode) {
+  if (prevCode === null) return true;                 // start of file
+  if (REGEX_OPENERS.has(prevCode)) return true;
+  return false;
+}
+
 export function commentMask(source) {
   const src = String(source ?? '');
   const mask = new Uint8Array(src.length);
   let i = 0;
+  const chr10 = String.fromCharCode(10);
+  let prev = null;                                    // last significant CODE character seen
   while (i < src.length) {
     const c = src[i], d = src[i + 1];
+
+    // ⚑ A REGEX LITERAL IS NOT A COMMENT, AND `/\//` LOOKS EXACTLY LIKE ONE. The scanner had no
+    // branch for regexes: it stepped over the backslash one character at a time, then read the next
+    // two as `//` and masked to end of line — or as `/*` and masked to the next `*/` anywhere in the
+    // file, swallowing whole functions. Every masked byte is skipped by mutants(), so those decision
+    // points were never offered and never reported, and the gate returned clean:true and score 1 for
+    // a file with live test-theatre in it. `p.split(/\//g)` is enough to trigger it.
+    //
+    // That is worse than missing a line: clean:true is an affirmative claim that the line WAS tested.
+    if (c === '/' && d !== '/' && d !== '*' && regexAllowed(prev)) {
+      i += 1;                                         // past the opening slash
+      let inClass = false;
+      while (i < src.length) {
+        const ch = src[i];
+        if (ch === '\\') { i += 2; continue; }        // an escape covers the next character whole
+        if (ch === '[') inClass = true;
+        else if (ch === ']') inClass = false;
+        else if (ch === '/' && !inClass) { i += 1; break; }
+        else if (ch === chr10) break;                  // an unterminated regex is not a regex
+        i += 1;
+      }
+      prev = '/';
+      continue;
+    }
+
     if (c === '/' && d === '/') {
       while (i < src.length && src[i] !== '\n') mask[i++] = 1;
       continue;
@@ -133,8 +171,10 @@ export function commentMask(source) {
         if (src[i] === quote) { i += 1; break; }
         i += 1;
       }
+      prev = c;
       continue;
     }
+    if (!/\s/.test(c)) prev = c;
     i += 1;
   }
   return mask;
@@ -488,7 +528,18 @@ async function main() {
   process.exit(2);
 }
 
-if (import.meta.url === `file://${process.argv[1]}` || import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+// ⛑ THIS GUARD COMPARED A RAW PATH AGAINST A PERCENT-ENCODED URL. import.meta.url encodes, argv[1]
+// does not — so in any directory whose name needs encoding (a SPACE, an accent, any CJK character)
+// neither hand-built form matched, main() was never called, and the process fell off the end of the
+// module printing nothing and exiting 0. CI reads exit 0 as a clean gate.
+//
+// That is this tool's own worst failure — a green from a run that did nothing — reached by the most
+// ordinary fact about a filesystem there is, and it is not a Windows quirk: /home/josé encodes too.
+// Reproduced by copying witness into a folder called "my gate": no banner, no JSON, no verdict,
+// exit 0, on a file with a live surviving mutant.
+//
+// Canonical URLs on both sides, so there is nothing left to hand-build wrongly.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
 
