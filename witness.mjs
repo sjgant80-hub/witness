@@ -205,6 +205,19 @@ function runSuiteOnce(testCmd, { cwd, timeout }) {
 // Kill anything the run left behind. Called after EVERY run, not only after a timeout: a suite can
 // leak a daemon on its way out just as easily. `catch {}` because "already gone" is the normal case
 // and the only other outcome worth a word would be a permissions failure we could not act on anyway.
+// Is this a process we could actually own? In kill(2) the target is not always a process: -1 means
+// EVERY process the caller may signal and 0 means the caller's own group, so a value that coerces to
+// 1 turns a cleanup call into "kill the machine". A pid is an integer above 1 — one is init, zero
+// and minus one are broadcasts, and a non-integer is not a pid at all.
+//
+// Written as separate statements on purpose. As one expression it would carry a `||` that a single
+// mutation could collapse into a bypass, and the only way to notice would be to send the signal.
+export function isReapablePid(pid) {
+  if (!Number.isInteger(pid)) return false;
+  if (pid <= 1) return false;
+  return true;
+}
+
 export function reapTree(pid, detached) {
   // ⚑ A TRUTHY NON-PID COULD SIGNAL THE WHOLE MACHINE. The guard used to be `!pid`, which stops 0
   // and -0 but lets through anything else truthy — and in kill(2) the target is not just a process:
@@ -216,9 +229,18 @@ export function reapTree(pid, detached) {
   // for the step, because nothing survived to report one. In normal use `pid` comes from spawnSync
   // and is a real child, which is exactly the kind of "cannot happen" this session keeps disproving.
   //
-  // A pid is a positive integer above 1. 1 is init, 0 and -1 are broadcast targets, and anything
-  // non-integer is not a pid at all — none of them are ours to kill.
-  if (!Number.isInteger(pid) || pid <= 1) return false;
+  // ⚑ AND THE GUARD MUST NOT BE TESTABLE BY CALLING IT. The first fix put the check inline here, as
+  // `!Number.isInteger(pid) || pid <= 1`, and the only way to assert it was to hand reapTree a
+  // broadcast value and check it came back false. That is a test which, under the very mutation it
+  // exists to catch, SENDS THE SIGNAL: flip `<=` to `<` and reapTree(1) reaches process.kill(-1),
+  // which is SIGKILL to every process the user owns. The suite then kills the runner instead of
+  // reporting a survivor, the step ends with no conclusion at all, and the gate can never go green —
+  // it took four CI runs to see that the gate was not failing, it was dying.
+  //
+  // So the decision is a pure predicate, asserted without sending anything, and the guards here are
+  // separate statements rather than one expression: there is no `||` left for a mutation to collapse
+  // into a bypass, and nothing below can be reached with a target that is not a real child.
+  if (!isReapablePid(pid)) return false;
   if (pid === process.pid) return false;            // never signal ourselves
   try {
     if (process.platform === 'win32') {

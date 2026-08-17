@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree } from './witness.mjs';
+import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree, isReapablePid } from './witness.mjs';
 import { spawn } from 'node:child_process';
 
 const SRC = 'fixtures/boundary.mjs';
@@ -587,14 +587,6 @@ test('reapTree reports whether the kill actually landed', () => {
   // throws, so that branch alone would leave this arm unasserted there — and it did: the mutant
   // survived on Windows while dying on Linux. A pid that cannot even be stringified reaches the
   // catch on both.
-  // ⚑ THE BROADCAST TARGETS. In kill(2) the argument is not always a process: -1 means EVERY
-  // process the caller may signal, and 0 means the caller's own group. So any value that coerces to
-  // 1 turns this cleanup call into "kill the machine". A test here passed `true` among its hostile
-  // inputs and did exactly that on the Linux CI runner — the job reported no conclusion for the
-  // step, because nothing survived to report one. These must be refused before any signal is sent.
-  for (const broadcast of [true, 1, '1', 1.0, -1, 0, -0, '0']) {
-    assert.equal(reapTree(broadcast, true), false, `a broadcast target was accepted at index ${String(Number(broadcast))}`);
-  }
   assert.equal(reapTree(process.pid, true), false, 'it would have signalled itself');
 
   // A signal that THREW must come back false. Claiming a kill that never happened is the failure
@@ -609,12 +601,43 @@ test('reapTree reports whether the kill actually landed', () => {
   // would take the gate down mid-run and leave a mutant on disk.
   // NB the failure message must not stringify the value — one of these throws on toString, which is
   // why it is here, and building the message would throw before the assertion ran.
+  // ⚑ NO NEGATIVE INTEGERS HERE. reapTree computes -pid, so a negative integer becomes a POSITIVE
+  // target: under a mutation of the guard, reapTree(-7) would send SIGKILL to process 7. That is the
+  // same trap as the broadcast values — a hostile-input list that turns into a real signal the
+  // moment the guard it tests is broken. Negative integers are asserted on the pure predicate
+  // instead, where nothing can be sent.
   const junkValues = [Symbol('x'), { toString() { throw new TypeError('unreadable'); } }, {}, [],
-                      'not a pid', NaN, Infinity, -Infinity, null, undefined, 2.5, -7];
+                      'not a pid', NaN, Infinity, -Infinity, null, undefined, 2.5];
   for (const [i, junk] of junkValues.entries()) {
     assert.doesNotThrow(() => reapTree(junk, true), `reapTree threw on junkValues[${i}]`);
     assert.doesNotThrow(() => reapTree(junk, false), `reapTree threw on junkValues[${i}] undetached`);
     assert.equal(reapTree(junk, true), false, `junkValues[${i}] was treated as a pid`);
+  }
+});
+
+test('⚑ the broadcast targets are refused, and asserting it sends nothing', () => {
+  // In kill(2) the target is not always a process: -1 means EVERY process the caller may signal and
+  // 0 means the caller's own group, so anything coercing to 1 turns a cleanup call into "kill the
+  // machine". It happened: a test passed `true` among its hostile inputs and took down the CI
+  // runner, and the step reported no conclusion because nothing survived to report one.
+  //
+  // ⚑ THIS IS A PURE PREDICATE TEST FOR THAT REASON. Asserting the guard by calling reapTree with a
+  // broadcast value is a test that SENDS THE SIGNAL under the exact mutation it exists to catch —
+  // flip the bound and reapTree(1) reaches process.kill(-1). Four CI runs died that way before it
+  // was clear the gate was not failing but dying. Nothing here signals anything.
+  for (const broadcast of [1, 0, -1, -0, 1.0]) {
+    assert.equal(isReapablePid(broadcast), false, `${broadcast} is a broadcast target and must be refused`);
+  }
+  assert.equal(isReapablePid(2), true, 'a real child pid must still be reapable');
+  assert.equal(isReapablePid(99999), true);
+  // and only integers are pids at all
+  for (const junk of [true, '1', '0', 2.5, NaN, Infinity, null, undefined, {}, [], Symbol('x')]) {
+    assert.equal(isReapablePid(junk), false, 'a non-integer was treated as a pid');
+  }
+  // negative integers ARE integers, so they need their own assertion — and reapTree negates its
+  // argument, which would turn -7 into a live target for process 7 if this ever stopped refusing.
+  for (const neg of [-2, -7, -99999]) {
+    assert.equal(isReapablePid(neg), false, 'a negative pid would become a positive kill target');
   }
 });
 test('the operator set never mis-hits an arrow function or shift', () => {
