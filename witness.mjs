@@ -206,7 +206,20 @@ function runSuiteOnce(testCmd, { cwd, timeout }) {
 // leak a daemon on its way out just as easily. `catch {}` because "already gone" is the normal case
 // and the only other outcome worth a word would be a permissions failure we could not act on anyway.
 export function reapTree(pid, detached) {
-  if (!pid || pid === process.pid) return false;    // never signal ourselves
+  // ⚑ A TRUTHY NON-PID COULD SIGNAL THE WHOLE MACHINE. The guard used to be `!pid`, which stops 0
+  // and -0 but lets through anything else truthy — and in kill(2) the target is not just a process:
+  // `kill(-1, …)` means EVERY process the caller may signal, and `kill(0, …)` means the caller's own
+  // group. So `reapTree(true)` or `reapTree('1')` computes -1 and sends SIGKILL to everything.
+  //
+  // This is not hypothetical. A test in this repo passed `true` in a list of hostile inputs, and on
+  // the Linux CI runner it killed the runner agent itself: the job reported no conclusion at all
+  // for the step, because nothing survived to report one. In normal use `pid` comes from spawnSync
+  // and is a real child, which is exactly the kind of "cannot happen" this session keeps disproving.
+  //
+  // A pid is a positive integer above 1. 1 is init, 0 and -1 are broadcast targets, and anything
+  // non-integer is not a pid at all — none of them are ours to kill.
+  if (!Number.isInteger(pid) || pid <= 1) return false;
+  if (pid === process.pid) return false;            // never signal ourselves
   try {
     if (process.platform === 'win32') {
       spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore' });

@@ -587,27 +587,36 @@ test('reapTree reports whether the kill actually landed', () => {
   // throws, so that branch alone would leave this arm unasserted there — and it did: the mutant
   // survived on Windows while dying on Linux. A pid that cannot even be stringified reaches the
   // catch on both.
-  // NB not a Symbol: String(sym) is specified to return "Symbol(x)" rather than throw, so it sails
-  // through the Windows branch and reports success. A value whose toString throws reaches the catch
-  // on both platforms — on POSIX because -pid is then NaN and process.kill rejects it.
-  const unstringifiable = { toString() { throw new TypeError('this pid cannot be read'); } };
-  assert.equal(reapTree(unstringifiable, true), false, 'a kill that threw was reported as a success');
+  // ⚑ THE BROADCAST TARGETS. In kill(2) the argument is not always a process: -1 means EVERY
+  // process the caller may signal, and 0 means the caller's own group. So any value that coerces to
+  // 1 turns this cleanup call into "kill the machine". A test here passed `true` among its hostile
+  // inputs and did exactly that on the Linux CI runner — the job reported no conclusion for the
+  // step, because nothing survived to report one. These must be refused before any signal is sent.
+  for (const broadcast of [true, 1, '1', 1.0, -1, 0, -0, '0']) {
+    assert.equal(reapTree(broadcast, true), false, `a broadcast target was accepted at index ${String(Number(broadcast))}`);
+  }
+  assert.equal(reapTree(process.pid, true), false, 'it would have signalled itself');
+
+  // A signal that THREW must come back false. Claiming a kill that never happened is the failure
+  // mode: the sweep is the last thing between a killed run and a mutant left on disk, and a caller
+  // that believes a false success stops looking.
   if (process.platform !== 'win32') {
     const gone = spawnSync(process.execPath, ['-e', '0']);
     assert.equal(reapTree(gone.pid, true), false, 'reaping an already-dead group was reported as a kill');
   }
 
-  // And it must never throw, whatever it is handed. This runs in a `finally`-shaped cleanup path;
-  // one that throws would take the gate down mid-run and leave a mutant on disk.
-  // NB the failure message must not stringify the value: one of these throws on toString, which is
-  // the whole point of including it, and building the message would throw before the assertion ran.
-  const junkValues = [Symbol('x'), unstringifiable, {}, [], 'not a pid', NaN, Infinity, -0, true];
+  // And it must never throw, whatever it is handed. This runs in a cleanup path; one that throws
+  // would take the gate down mid-run and leave a mutant on disk.
+  // NB the failure message must not stringify the value — one of these throws on toString, which is
+  // why it is here, and building the message would throw before the assertion ran.
+  const junkValues = [Symbol('x'), { toString() { throw new TypeError('unreadable'); } }, {}, [],
+                      'not a pid', NaN, Infinity, -Infinity, null, undefined, 2.5, -7];
   for (const [i, junk] of junkValues.entries()) {
     assert.doesNotThrow(() => reapTree(junk, true), `reapTree threw on junkValues[${i}]`);
     assert.doesNotThrow(() => reapTree(junk, false), `reapTree threw on junkValues[${i}] undetached`);
+    assert.equal(reapTree(junk, true), false, `junkValues[${i}] was treated as a pid`);
   }
 });
-
 test('the operator set never mis-hits an arrow function or shift', () => {
   // `=>` and `>>>` must not be mutated (no spaced `>` there)
   assert.equal(mutants('const f = () => x;').length, 0);
