@@ -26,11 +26,31 @@ if (!Number.isFinite(bound) || bound <= 0 || cmd.length === 0) {
 }
 
 const onWindows = process.platform === 'win32';
-const child = spawn(cmd[0], cmd.slice(1), {
-  stdio: 'inherit',
-  shell: onWindows,          // npm is npm.cmd here; the parent relied on the same thing
-  detached: !onWindows,      // POSIX: its own process group, so one signal reaches the whole tree
-});
+
+// ⚑ ONE ARGUMENT WITH SPACES IN IT IS A COMMAND LINE, NOT A FILENAME.
+// `--test "node --test a.mjs"` reaches us as a single argv element. Windows ran everything through
+// a shell anyway, so it worked there and only there; on POSIX the shell was off, and cmd[0] was
+// looked up as an executable literally named "node --test a.mjs" — which cannot exist. spawn fails
+// instantly, the baseline is read as red, and the gate refuses to run against a perfectly green
+// tree. Same root as the false greens this tool exists to catch: a spawn nobody checked started.
+const isCommandLine = cmd.length === 1 && /\s/.test(cmd[0]);
+
+// ⚑ AND THE SHELL IS NOT FREE. Turning it on unconditionally on Windows re-splits the command on
+// spaces, so an absolute interpreter path under "Program Files" is torn in half and the run dies as
+// 'C:\Program' is not recognized. The shell is needed for a command LINE anywhere, and for a bare
+// name on Windows (npm is really npm.cmd, which spawn cannot find on its own). Handed an actual
+// path, spawn it directly — that is the one form that survives a space in the path.
+const bareName = !/[\\/]/.test(cmd[0]);
+const useShell = isCommandLine || (onWindows && bareName);
+const child = spawn(
+  cmd[0],
+  isCommandLine ? [] : cmd.slice(1),
+  {
+    stdio: 'inherit',
+    shell: useShell,         // npm is npm.cmd on Windows; a quoted command line needs a shell anywhere
+    detached: !onWindows,    // POSIX: its own process group, so one signal reaches the whole tree
+  },
+);
 
 // Kill the tree while this process is still its ancestor and the links still resolve.
 function killTree() {

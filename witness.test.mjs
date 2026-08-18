@@ -860,3 +860,34 @@ test('a real, argued exemption still works', () => {
   assert.equal(r.rejectedExemptions.length, 0);
   assert.equal(r.ignored[0].reason.length >= MIN_REASON_CHARS, true, 'and the real reason is carried, not a fabricated one');
 });
+
+test('a quoted command line runs on every platform, not only where the shell was already on', async () => {
+  // ⚑ The false RED. `--test "node --test a.mjs"` arrives as one argv element. Windows spawned
+  // everything through a shell so it worked there; POSIX looked for an executable literally named
+  // "node --test a.mjs", spawn died in milliseconds, and the gate called a green tree red. Every
+  // ubuntu CI in the estate was gating on a baseline that never ran.
+  const dir = mkdtempSync(join(tmpdir(), 'witness-cmdline-'));
+  try {
+    writeFileSync(join(dir, 'ok.mjs'), 'process.exit(0)\n');
+    writeFileSync(join(dir, 'bad.mjs'), 'process.exit(3)\n');
+    const runner = new URL('./runner.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+
+    // One argument, spaces inside: a command line.
+    // Plain `node`, exactly as a CI file writes it. An absolute path with a space in it would need
+    // quoting by whoever wrote the command line, which is not this tool's business to guess.
+    const good = spawnSync(process.execPath, [runner, '20000', 'node ok.mjs'],
+      { cwd: dir, encoding: 'utf8' });
+    assert.equal(good.status, 0,
+      `a quoted command line did not run: status=${good.status} err=${(good.stderr || '').slice(0, 200)}`);
+
+    // And it must still report a real failure rather than swallowing it into the shell.
+    const bad = spawnSync(process.execPath, [runner, '20000', 'node bad.mjs'],
+      { cwd: dir, encoding: 'utf8' });
+    assert.equal(bad.status, 3, 'a failing suite came back as ' + bad.status);
+
+    // The argv form must keep working exactly as before.
+    const argv = spawnSync(process.execPath, [runner, '20000', process.execPath, 'ok.mjs'],
+      { cwd: dir, encoding: 'utf8' });
+    assert.equal(argv.status, 0, 'the plain argv form regressed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
