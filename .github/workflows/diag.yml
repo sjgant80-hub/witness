@@ -1,13 +1,27 @@
 name: diag-wrapped-baseline
 on: [push]
 jobs:
-  wrapped:
+  # Run the runner-gate FRESH, with nothing before it. If this is clean+green, the red baseline
+  # in the real self-gate was caused by step 1 (the ~2h witness self-gate) polluting the shared
+  # runner, not by any defect in Kar's tests or the gate. If this ALSO goes red, a test flakes
+  # under witness's double-detached baseline spawn.
+  isolated-runner-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: runner-gate in ISOLATION
+        run: node witness.mjs mutate runner.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs
+
+  # Re-confirm the exact runSuiteOnce baseline is green fresh (fast control).
+  baseline-control:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: replicate witness runSuiteOnce EXACTLY (the real baseline)
-        if: always()
-        run: node diag-runsuite.mjs
+      - run: node diag-runsuite.mjs
