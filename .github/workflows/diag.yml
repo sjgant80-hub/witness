@@ -1,0 +1,22 @@
+name: diag-wrapped-baseline
+on: [push]
+jobs:
+  wrapped:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: unwrapped control (should be green, == the test job)
+        if: always()
+        run: |
+          set +e
+          node --test witness.test.mjs 2>&1 | grep -E "^(not ok|# fail|# pass|# tests)" | head -40
+          echo "UNWRAPPED_EXIT=${PIPESTATUS[0]}"
+      - name: wrapped through runner.mjs (reproduces the red baseline)
+        if: always()
+        run: |
+          set +e
+          node runner.mjs 600000 node --test witness.test.mjs 2>&1 | grep -E "^(not ok|# fail|# pass|# tests|  ---|    error|    code|    stack|    failureType|    expected|    actual)" | head -80
+          echo "WRAPPED_EXIT=${PIPESTATUS[0]}"
