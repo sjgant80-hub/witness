@@ -26,37 +26,37 @@
   {
     "line": 118,
     "mutation": "=== → !==",
-    "snippet": "  if (prevCode === null) return true;                 // start of file",
+    "snippet": "if (prevCode === null) return true;                 // start of file",
     "reason": "Equivalent, and checked rather than argued. regexAllowed's start-of-file guard. Whether a slash at the very start of the file opens a regex only shifts which characters the regex-consumer steps over on its way to the first real token; those characters are never mutable operators, and the consumer lands before any real operator either way. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
   },
   {
     "line": 120,
     "mutation": "return false → return true",
-    "snippet": "  return false;",
+    "snippet": "return false;",
     "reason": "Equivalent, and checked rather than argued. regexAllowed's default result. Treating a slash after a non-opener character as a regex instead of division only changes where the consumer starts; the scanned characters hold no mutable operators and no comment boundary is moved onto real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
   },
   {
     "line": 145,
     "mutation": "=== → !==",
-    "snippet": "        if (ch === '\\\\') { i += 2; continue; }        // an escape covers the next character whole",
+    "snippet": "if (ch === '\\\\') { i += 2; continue; }        // an escape covers the next character whole",
     "reason": "Equivalent, and checked rather than argued. The regex body's escape check. Flipping it changes how the escape is stepped over, but a regex body contains no mutable operators and the consumer still terminates before real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
   },
   {
     "line": 146,
     "mutation": "=== → !==",
-    "snippet": "        if (ch === '[') inClass = true;",
+    "snippet": "if (ch === '[') inClass = true;",
     "reason": "Equivalent, and checked rather than argued. The regex character-class open. Flipping it changes only how the class boundary is tracked inside the regex body, which holds no mutable operators, and the consumer still terminates before real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
   },
   {
     "line": 147,
     "mutation": "=== → !==",
-    "snippet": "        else if (ch === ']') inClass = false;",
-    "reason": "Equivalent, and checked rather than argued. The regex character-class close, the mirror of line 146. It only affects class tracking inside the regex body, which holds no mutable operators. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
+    "snippet": "else if (ch === ']') inClass = false;",
+    "reason": "Equivalent, and checked rather than argued. The regex character-class close, mirror of line 146. It only affects class tracking inside the regex body, which holds no mutable operators. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
   },
   {
     "line": 236,
     "mutation": "!== → ===",
-    "snippet": "  const detached = process.platform !== 'win32';",
-    "reason": "Reviewed exemption, argued not equivalent-by-value. This sets `detached` for the spawned test process, a runtime OS process-group choice. On a single platform the two values do not change what mutants() produces or which assertions the suite makes — they change only whether a timed-out child's grandchildren are reaped as a group. Killing it would require a deliberately-orphaning, platform-specific, flaky test. Confirmed suite-invariant at the mutants() level by differential fuzz over 8,000+ inputs; the runtime reaping path itself is exercised by the timeout tests. Accepted as platform-behavioral, not proven value-equivalent."
+    "snippet": "const detached = process.platform !== 'win32';",
+    "reason": "Reviewed exemption, argued not equivalent-by-value. This sets `detached` for the spawned test process, a runtime OS process-group choice. On a single platform the two values do not change what mutants() produces or which assertions the suite makes — they change only whether a timed-out child's grandchildren are reaped as a group. Killing it would need a deliberately-orphaning, platform-specific, flaky test. Confirmed suite-invariant at the mutants() level by differential fuzz over 8,000+ inputs; the runtime reaping path is exercised by the timeout tests. Accepted as platform-behavioral, not proven value-equivalent."
   }
 ]

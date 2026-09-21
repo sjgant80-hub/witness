@@ -903,3 +903,63 @@ test('a quoted command line runs on every platform, not only where the shell was
     assert.equal(argv.status, 0, 'the plain argv form regressed');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ── runner.mjs: the argv guard and the exit-code arithmetic ──────────────────────
+// Three survivors of the self-gate were all the same guard collapsing from different angles: a `<`
+// mutant only breaks the boundary at bound===0 (a negative bound still fails the mutated check the
+// same as the real one), and either `||` flipped to `&&` degenerates `A || B || C` down to just `C`
+// or just `A` once the OTHER operand of the flipped pair is false — which it is at bound===0 with a
+// real command present, since the bound is finite (A false) and the command is non-empty (C false).
+// One test at that exact boundary pins all three at once.
+
+function runnerPath() {
+  return new URL('./runner.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+}
+
+test('the argv guard refuses a zero bound — not just a negative one, and not by luck of the other clauses', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'witness-boundzero-'));
+  try {
+    writeFileSync(join(dir, 'ok.mjs'), 'process.exit(0)\n');
+    const runner = runnerPath();
+    const r = spawnSync(process.execPath, [runner, '0', 'node', 'ok.mjs'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 2, `bound=0 did not refuse: status=${r.status} stderr=${(r.stderr || '').slice(0, 200)}`);
+    assert.match(r.stderr || '', /usage/i, 'the usage message was not printed');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a quoted command line still gets a shell when its program is given with a path, not just a bare name', () => {
+  // ⚑ isCommandLine ALONE MUST TURN THE SHELL ON. `useShell = isCommandLine || (onWindows && bareName)`
+  // collapsed to `&&` makes the shell depend on bareName too — and a quoted command line whose program
+  // is written with a path (a slash anywhere in the one argv element) has bareName false on every
+  // platform, so the mutant drops the shell exactly when isCommandLine needed it most. A CI step
+  // writing `node scripts/run.mjs` verbatim is this exact shape.
+  const dir = mkdtempSync(join(tmpdir(), 'witness-notbare-'));
+  try {
+    mkdirSync(join(dir, 'nested'));
+    writeFileSync(join(dir, 'nested', 'ok.mjs'), 'process.exit(0)\n');
+    const runner = runnerPath();
+    const r = spawnSync(process.execPath, [runner, '20000', 'node nested/ok.mjs'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0, `a slash in the command line lost its shell: status=${r.status} stderr=${(r.stderr || '').slice(0, 200)}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a child killed by a signal exits 128+signal, not some other arithmetic on 128', () => {
+  // ⚑ POSIX reports a genuine signal death via the kernel's own wait() status regardless of who sent
+  // it, so a child that signals itself proves the arithmetic there. Windows has no such status: Node
+  // can attribute `signal` on a child's exit only for a kill ITS OWN ChildProcess.kill() issued — which
+  // this file never calls (it shells out to taskkill) — so the branch is provably unreachable on
+  // Windows specifically. Verified by direct probe: child.kill('SIGTERM') reports signal='SIGTERM' on
+  // win32, but an external taskkill /F (what killTree actually does) reports code=1, signal=null, and
+  // so does a synthetic NTSTATUS exit code. That is a platform fact about Node, not a gap in this test.
+  const dir = mkdtempSync(join(tmpdir(), 'witness-sigterm-'));
+  try {
+    writeFileSync(join(dir, 'suicide.mjs'), "process.kill(process.pid, 'SIGTERM');\nsetInterval(() => {}, 1000);\n");
+    const runner = runnerPath();
+    const r = spawnSync(process.execPath, [runner, '5000', 'node', 'suicide.mjs'], { cwd: dir, encoding: 'utf8' });
+    if (process.platform === 'win32') {
+      assert.equal(r.status, 1, `unexpected status on win32: ${r.status}`);
+    } else {
+      assert.equal(r.status, 143, `a self-SIGTERM came back as ${r.status}, not 128+15`);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
