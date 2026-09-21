@@ -943,6 +943,57 @@ test('a quoted command line still gets a shell when its program is given with a 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+// ── two survivors of the ISOLATED runner-gate (fresh ubuntu, no baseline flake in the way) ──────
+// `witness mutate runner.mjs` run clean, on its own, found two real holes: `cmd.length === 1 &&
+// /\s/.test(cmd[0])` (line 36) and the INNER `onWindows && bareName` inside `useShell` (line 44)
+// both weaken to `||` and survive every existing test. Both mutants are POSIX-only: on Windows,
+// `onWindows` alone already forces the shell on, so the inner `&&`'s value is masked, and every
+// existing quoted-command-line test already pins isCommandLine on Windows through that same path —
+// the two lines are genuinely equivalent there. Both tests below are guarded to the platform where
+// the mutant is NOT equivalent, same shape as the 128+15 SIGTERM test above.
+
+test('a first token with whitespace and a trailing arg is NOT a command line by itself', () => {
+  // ⚑ `cmd.length === 1 && /\s/.test(cmd[0])` weakened to `||` turns isCommandLine on for ANY
+  // element with whitespace, even with more argv elements after it — and isCommandLine mode drops
+  // every argument but cmd[0] (`isCommandLine ? [] : cmd.slice(1)`) and shells cmd[0] out verbatim.
+  // A two-element cmd whose first element has an embedded space is the one input only `||` gets
+  // wrong: the real, argv-form guard (`&&`, length!==1) tries to exec a file literally named
+  // "node ok.mjs" — ENOENT, 127. The mutant drops "extra", shells "node ok.mjs" for real — exit 0.
+  // (This same input also kills the line-44 survivor below: with cmd.length!==1 the shell turns on
+  // there too, but isCommandLine stays false so "extra" is kept and the shell runs "node ok.mjs
+  // extra" — ok.mjs still exits 0, so it reads identically to the line-36 mutant here. One test,
+  // both boundaries; line 44 also gets its own test below for a cleaner 1:1 kill-map.)
+  if (process.platform === 'win32') return;   // onWindows already forces the shell on, by a different clause
+  const dir = mkdtempSync(join(tmpdir(), 'witness-notcmdline-'));
+  try {
+    writeFileSync(join(dir, 'ok.mjs'), 'process.exit(0)\n');
+    const runner = runnerPath();
+    const r = spawnSync(process.execPath, [runner, '20000', 'node ok.mjs', 'extra'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 127,
+      `a 2-element cmd with a space in cmd[0] was treated as a command line: status=${r.status} stderr=${(r.stderr || '').slice(0, 200)}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a bare multi-arg command runs argv-exact, not through a shell that re-splits its arguments', () => {
+  // ⚑ `isCommandLine || (onWindows && bareName)` weakened on the INNER `&&` to `||` turns the shell
+  // on for ANY bare-name program, not only on Windows — and the shell is not free: runner.mjs builds
+  // the shell command with a plain `[cmd[0], ...args].join(' ')` (no escaping — that is a documented
+  // Node.js shell:true hazard, not a bug here), so the target shell re-splits on whitespace and an
+  // argument that legitimately contains a space arrives as two. `node` is a bare name (bareName=true)
+  // and this is an ordinary argv-form call (isCommandLine=false), so the real POSIX guard never
+  // shells out here at all — the child must see its one argument intact.
+  if (process.platform === 'win32') return;   // bareName already forces the shell on here, by design
+  const dir = mkdtempSync(join(tmpdir(), 'witness-bareargv-'));
+  try {
+    writeFileSync(join(dir, 'printarg.mjs'),
+      "process.exit(process.argv.length === 3 && process.argv[2] === 'a b' ? 0 : 1);\n");
+    const runner = runnerPath();
+    const r = spawnSync(process.execPath, [runner, '20000', 'node', 'printarg.mjs', 'a b'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(r.status, 0,
+      `a bare-name argv command was shelled out and its argument re-split: status=${r.status} stderr=${(r.stderr || '').slice(0, 200)}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('a child killed by a signal exits 128+signal, not some other arithmetic on 128', () => {
   // ⚑ POSIX reports a genuine signal death via the kernel's own wait() status regardless of who sent
   // it, so a child that signals itself proves the arithmetic there. Windows has no such status: Node
