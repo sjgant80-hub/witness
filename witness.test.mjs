@@ -93,6 +93,18 @@ test('a block comment must not swallow the operator that follows it', () => {
   assert.equal(mutants('const y = x /*why*/ === z;').length, 1);
 });
 
+// ── the regex-literal scanner must CONSUME a `/regex/`, or a slash inside it starts a phantom comment
+// that masks the real code after it — the exact bug it was added to fix. Each input below has a real
+// `===` after a slash-filled regex: if the scanner mis-reads the regex (its start-of-file guard, its
+// `/` terminator, or its `&& !inClass` decision), a phantom `//` swallows the `===` and mutants()
+// drops from 1 to 0. A single-count assertion therefore gates those decision points. ──
+test('the regex-literal scanner consumes a regex so trailing operators stay mutable', () => {
+  // a regex full of slashes at the very start of the file (regexAllowed(null)); the === after must survive
+  assert.equal(mutants('/x\\/\\//.test(z); x === y').length, 1);
+  // slashes inside a character class must not terminate the regex early and open a phantom comment
+  assert.equal(mutants('s.split(/[//]/); x === y').length, 1);
+});
+
 test('a quote must not swallow the rest of the file', () => {
   // The escape check is the only branch that can advance past a closing quote correctly. Invert it
   // and every character skips two, so the closing quote is stepped over, the string never ends, and
