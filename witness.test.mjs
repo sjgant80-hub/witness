@@ -286,6 +286,22 @@ test('the CLI exits non-zero when there was nothing to mutate', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('the CLI names a red baseline honestly, not as "0 mutant(s) SURVIVED"', () => {
+  // Found live (2026-09-22, karma-didy's own wall review of a fresh repo missing tools/runner.mjs):
+  // a baselineFailed result (survived:[], clean:false) fell through to the generic !r.clean branch
+  // and printed "0 mutant(s) SURVIVED — those lines are test-theatre" — indistinguishable from a
+  // run that genuinely tested zero survivors, when actually NOTHING was validly tested at all. The
+  // real reason (why the baseline failed) was silently dropped from the human-readable line even
+  // though it was already sitting in the JSON. Same false-clean shape noMutants above already fixed
+  // for a different cause; this is the sibling case.
+  const dir = project();
+  const r = runCli(['mutate', 'src.mjs', '--test', 'node', '-e', 'process.exit(1)'], dir);
+  assert.notEqual(r.code, 0, 'a red baseline must still fail CI');
+  assert.doesNotMatch(r.err, /0 mutant\(s\) SURVIVED/, 'must not read as a clean run of zero survivors');
+  assert.match(r.err, /the unmutated test suite does not pass/i, 'the real reason must reach the human-readable line');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('a real file still passes the same path', () => {
   const dir = project();
   const r = runCli(['mutate', 'src.mjs', '--cap', '2', '--test', 'node', '-e', '0'], dir);

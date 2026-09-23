@@ -510,6 +510,12 @@ async function main() {
     // A run with nothing to mutate is not a pass and must not print like one. It used to reach the
     // ✓ branch and exit 0, so a mistyped path was indistinguishable from a gated file.
     if (r.noMutants) console.error(`\n✗ NOTHING WAS TESTED — ${r.reason}`);
+    // ⚑ Found live (karma-didy, 2026-09-22): baselineFailed (a red unmutated suite, or a timeout
+    // bound that leaves no room for a run) has survived:[] and clean:false — it used to fall through
+    // to the branch below and print "0 mutant(s) SURVIVED", indistinguishable from a run that
+    // genuinely tested zero survivors, silently dropping the real reason even though it was already
+    // sitting in the JSON. Same false-clean shape as noMutants above, different cause.
+    else if (r.baselineFailed) console.error(`\n✗ THE GATE DID NOT RUN — ${r.reason}`);
     else if (!r.clean) console.error(`\n✗ ${r.survived.length} mutant(s) SURVIVED — those lines are test-theatre.${ign}`);
     else console.error(`\n✓ ${r.killed}/${r.total} killed${ign} — no test-theatre.`);
     process.exit(r.clean ? 0 : 1);
