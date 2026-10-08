@@ -1,0 +1,6 @@
+{
+  "files": ["boundary.mjs"],
+  "testCommand": "node --test boundary.good.test.mjs",
+  "cap": 80,
+  "timeout": 120000
+}

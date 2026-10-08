@@ -1,0 +1,80 @@
+name: landing
+
+# The rail, landed on EXTERNAL code. This workflow clones a real, widely-used open-source library at
+# a PINNED commit — code nobody in this org wrote — installs its own devDependencies, and runs the
+# witness proof-of-play gate against ITS source using ITS own test suite. The run is the un-forgeable
+# proof: anyone can dispatch it and get the same verdict and the same anchor hash, because the gate is
+# deterministic over (library source + library tests + witness). Credit: vercel/ms, MIT.
+#
+# A surviving mutant is a real finding, not a workflow failure, so the gate step does not fail the job
+# — we WANT to publish what the rail found on real external code.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 1 * *'   # a fresh public proof on the 1st of each month
+
+permissions:
+  contents: read
+
+env:
+  EXT_REPO: https://github.com/vercel/ms.git
+  EXT_SHA: 1c6264b795492e8fdecbc82cb8802fcfbfc08d26   # ms v2.1.3, pinned
+
+jobs:
+  land:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check out witness (the gate)
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: clone the external library at a pinned commit
+        run: |
+          set -e
+          git clone --quiet "$EXT_REPO" _ext
+          cd _ext
+          git checkout --quiet "$EXT_SHA"
+          echo "landed on $(git remote get-url origin) @ $(git rev-parse HEAD)"
+
+      - name: install the library's own devDependencies
+        working-directory: _ext
+        run: npm install --no-audit --no-fund --loglevel=error
+
+      - name: declare what to gate (the adoption file — one file, this is the whole integration)
+        working-directory: _ext
+        run: |
+          cat > witness.bench.json <<'JSON'
+          { "files": ["index.js"], "testCommand": "npx mocha tests.js", "cap": 200, "timeout": 120000 }
+          JSON
+          cat witness.bench.json
+
+      - name: witness proof-of-play on external code
+        id: gate
+        continue-on-error: true
+        run: |
+          WITNESS_DIR="$GITHUB_WORKSPACE"
+          cd _ext
+          GITHUB_WORKSPACE="$PWD" node "$WITNESS_DIR/ci.mjs"
+
+      - name: show the receipt
+        working-directory: _ext
+        run: |
+          echo "=== Proof-of-Play receipt (external landing) ==="
+          cat witness-receipt.json
+          echo ""
+          echo "anchor reproduces the committed landing when it equals:"
+          node -e "process.stdout.write(require('$GITHUB_WORKSPACE/landing/ms-receipt.json').hash + '\n')"
+
+      - name: upload the external proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: witness-landing-ms
+          path: |
+            _ext/witness-receipt.json
+            _ext/witness-verdict.json
+            _ext/witness-badge.json
+          if-no-files-found: warn

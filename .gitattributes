@@ -1,0 +1,8 @@
+# Canonical LF everywhere. witness-bench fingerprints witness.mjs's bytes into the Proof-of-Play
+# anchor; CRLF on a Windows checkout vs LF on a Linux runner would make the same code fingerprint
+# differently and the receipt would not reproduce across machines. Force LF so it does.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.witnessbak binary

@@ -1,52 +1,73 @@
-name: 'witness — deterministic build gate'
-description: 'Fail the build on surviving mutants (test-theatre) or hostile-input throws. No LLM, zero deps.'
+name: 'witness — proof of play'
+description: 'Prove your tests have teeth: a mutation gate mints a re-runnable, un-forgeable receipt. Fails the build on test-theatre. No LLM, zero deps.'
 author: 'sjgant80-hub'
 branding:
   icon: 'shield'
   color: 'green'
 inputs:
   files:
-    description: 'Source files to run the mutation gate on (space- or newline-separated).'
-    required: true
+    description: 'Source files to gate (space/newline-separated). Optional if the repo has a witness.bench.json.'
+    required: false
+    default: ''
   test-command:
-    description: "The target project's test command (must exit non-zero on failure). Default: npm test."
+    description: "The repo's test command (must exit non-zero on failure). Used only when no witness.bench.json is present."
     required: false
     default: 'npm test'
   cap:
     description: 'Max mutants per file.'
     required: false
     default: '80'
-  fuzz:
-    description: 'Optional fuzz targets: space/newline-separated module.mjs:exportName pairs.'
+  timeout:
+    description: 'Per-mutant timeout in ms (must clear the suite comfortably; the gate refuses a bound under 2x the baseline).'
     required: false
-    default: ''
+    default: '600000'
   node-version:
     description: 'Node version to run the gate under.'
     required: false
     default: '20'
+  upload-artifact:
+    description: 'Upload the receipt + verdict + badge as a build artifact.'
+    required: false
+    default: 'true'
+outputs:
+  badge:
+    description: 'true if the tests killed every mutant (the badge was earned).'
+    value: ${{ steps.gate.outputs.badge }}
+  hash:
+    description: 'The receipt anchor hash — reproduces on any clean runner.'
+    value: ${{ steps.gate.outputs.hash }}
 runs:
   using: 'composite'
   steps:
     - uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-    - name: mutation gate
+    - name: witness proof-of-play gate
+      id: gate
       shell: bash
+      env:
+        WITNESS_FILES: ${{ inputs.files }}
+        WITNESS_TEST: ${{ inputs.test-command }}
+        WITNESS_CAP: ${{ inputs.cap }}
+        WITNESS_TIMEOUT: ${{ inputs.timeout }}
       run: |
-        set -e
-        for f in ${{ inputs.files }}; do
-          echo "::group::witness · mutation gate · $f"
-          node "${{ github.action_path }}/witness.mjs" mutate "$f" --cap "${{ inputs.cap }}" --test ${{ inputs.test-command }}
-          echo "::endgroup::"
-        done
-    - name: fuzz gate
-      if: ${{ inputs.fuzz != '' }}
-      shell: bash
-      run: |
-        set -e
-        for pair in ${{ inputs.fuzz }}; do
-          mod="${pair%%:*}"; fn="${pair##*:}"
-          echo "::group::witness · fuzz gate · $mod :: $fn"
-          node "${{ github.action_path }}/witness.mjs" fuzz "$mod" "$fn"
-          echo "::endgroup::"
-        done
+        set +e
+        node "${{ github.action_path }}/ci.mjs"
+        code=$?
+        if [ -f witness-verdict.json ]; then
+          badge=$(node -e "process.stdout.write(String(require('./witness-verdict.json').badge))")
+          hash=$(node -e "process.stdout.write(require('./witness-receipt.json').hash)")
+          echo "badge=$badge" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+        fi
+        exit $code
+    - name: upload the proof
+      if: ${{ always() && inputs.upload-artifact == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: witness-proof
+        path: |
+          witness-receipt.json
+          witness-verdict.json
+          witness-badge.json
+        if-no-files-found: ignore

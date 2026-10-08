@@ -1,9 +1,35 @@
 # witness
 
-**Live:** [sjgant80-hub.github.io/witness](https://sjgant80-hub.github.io/witness/)
+**▶ Live: https://sjgant80-hub.github.io/witness/** — prove your tests have teeth, and mint a receipt anyone can re-run.
 
-A **deterministic build gate** — catch *test-theatre* and *throw-on-malformed* **before** you push. No
-language model, no network, no dependencies. Node only, runs in seconds.
+A **drop-in CI gate** that proves a green suite would actually *catch a regression* — then mints an
+un-forgeable, re-runnable **Proof-of-Play** receipt. A mutation gate flips one operator per line and
+reruns *your own tests*; a surviving mutant is *test-theatre*. No LLM, no network, zero dependencies.
+
+### Landed on external code
+
+We pointed witness at **[vercel/ms](https://github.com/vercel/ms)** (pinned at `1c6264b`, ~250M
+downloads/week — a library nobody in this org wrote) and ran it against ms's own 49-test suite. The
+honest result: **15/17 mutants killed, score 0.882, 2 survivors** — two unguarded boundaries ms's tests
+never pin (`index.js:50`, the `> 100` max-input guard; `index.js:160`, the `>= n*1.5` pluralization
+boundary). Not bugs — exactly the test-theatre the gate exists to surface. Reproduced on GitHub's runner
+by the [`landing` workflow](../../actions/workflows/landing.yml); the receipt's anchor reproduces or it is
+refused. See [`landing/`](landing/).
+
+### Add it to your CI in 60 seconds
+
+```jsonc
+// witness.bench.json — the whole integration is this one file
+{ "files": ["src/index.js"], "testCommand": "npm test" }
+```
+
+```yaml
+# one step in your workflow
+- name: witness — proof of play
+  uses: sjgant80-hub/witness@v1
+```
+
+CI now fails on test-theatre and uploads a Proof-of-Play receipt + a step summary + a badge on every run.
 
 ## Why it exists
 

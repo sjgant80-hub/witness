@@ -1,2 +1,8 @@
 node_modules/
 *.witnessbak
+
+# witness scratch (local gate runs)
+_benchgate*
+_proof/
+_ci/
+_ext/

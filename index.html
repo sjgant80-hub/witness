@@ -3,24 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>witness — a deterministic build gate</title>
+<title>witness — prove your tests have teeth</title>
+<meta name="description" content="A drop-in CI gate that proves your tests actually catch regressions. A mutation gate flips one operator per line and runs your own tests; a surviving mutant is test-theatre. The pass is an un-forgeable, re-runnable Proof-of-Play receipt — paste a hash your code does not produce and verification refuses it. No LLM, zero dependencies. Shown landing on vercel/ms, a library downloaded ~250M times a week.">
+<meta name="color-scheme" content="dark light">
 <style>
   :root {
-    --bg: #0d1017; --panel: #151a23; --ink: #e6edf3; --dim: #9aa7b4; --line: #232a35;
-    --acc: #5ac8a8; --warn: #e0a458; --kill: #6ee7b7; --live: #7dd3fc; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --bg: #0d1017; --panel: #151a23; --panel2:#0e131b; --ink: #e6edf3; --dim: #9aa7b4; --line: #232a35;
+    --acc: #5ac8a8; --warn: #e0a458; --kill: #6ee7b7; --bad:#f0857d; --live: #7dd3fc; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
+  :root:not([data-theme="light"]){ color-scheme:dark; }
   @media (prefers-color-scheme: light) {
-    :root { --bg:#f7f9fb; --panel:#fff; --ink:#141a21; --dim:#586470; --line:#e3e8ee; --acc:#12876a; --warn:#a5610f; --kill:#0d7a54; --live:#0369a1; }
+    :root:not([data-theme="dark"]) { --bg:#f7f9fb; --panel:#fff; --panel2:#f0f3f8; --ink:#141a21; --dim:#586470; --line:#e3e8ee; --acc:#12876a; --warn:#a5610f; --kill:#0d7a54; --bad:#c0392b; --live:#0369a1; }
   }
+  :root[data-theme="dark"]{ --bg:#0d1017; --panel:#151a23; --panel2:#0e131b; --ink:#e6edf3; --dim:#9aa7b4; --line:#232a35; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 56px 22px 80px; }
+  .wrap { max-width: 840px; margin: 0 auto; padding: 56px 22px 80px; }
   h1 { font-size: 2.6rem; margin:0 0 4px; letter-spacing:-.02em; }
   h1 .dot { color:var(--acc); }
-  .tag { color:var(--dim); font-size:1.1rem; margin:0 0 26px; }
-  .live { display:inline-block; margin-bottom:34px; font-family:var(--mono); font-size:.82rem; color:var(--live); border:1px solid var(--line); border-radius:7px; padding:5px 11px; text-decoration:none; }
+  .tag { color:var(--dim); font-size:1.12rem; margin:0 0 22px; }
+  .live { display:inline-block; margin:0 8px 34px 0; font-family:var(--mono); font-size:.82rem; color:var(--live); border:1px solid var(--line); border-radius:7px; padding:5px 11px; text-decoration:none; }
   .live:hover { border-color:var(--live); }
-  h2 { font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:40px 0 14px; font-weight:600; }
+  h2 { font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:44px 0 14px; font-weight:600; }
   p { color:var(--ink); }
   .lead { font-size:1.12rem; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
@@ -30,74 +34,130 @@
   .card h3 .k { font-family:var(--mono); font-size:.8rem; color:var(--acc); }
   .card p { margin:0; color:var(--dim); font-size:.95rem; }
   pre { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:.86rem; line-height:1.7; }
-  .c-dim { color:var(--dim); }
-  .c-kill { color:var(--kill); }
-  .c-warn { color:var(--warn); }
+  .c-dim { color:var(--dim); } .c-kill { color:var(--kill); } .c-warn { color:var(--warn); } .c-bad { color:var(--bad); }
   code { font-family:var(--mono); font-size:.9em; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
   pre code { background:none; border:0; padding:0; }
   .note { border-left:3px solid var(--acc); padding:6px 0 6px 16px; color:var(--dim); margin:16px 0; }
   footer { margin-top:56px; padding-top:22px; border-top:1px solid var(--line); color:var(--dim); font-size:.85rem; }
   footer a { color:var(--live); }
+  /* landing panel */
+  .land { background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 7%,var(--panel)),var(--panel)); border:1px solid color-mix(in srgb,var(--acc) 32%,var(--line)); border-radius:14px; padding:22px 22px 18px; }
+  .land .hdr { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; }
+  .land .repo { font-family:var(--mono); font-weight:700; font-size:1.05rem; }
+  .pill { font-family:var(--mono); font-size:.72rem; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .stat { display:flex; gap:26px; flex-wrap:wrap; margin:14px 0 6px; }
+  .stat b { display:block; font-family:var(--mono); font-size:1.5rem; line-height:1.2; }
+  .stat span { color:var(--dim); font-size:.8rem; }
+  .surv { font-family:var(--mono); font-size:.82rem; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:10px; }
+  .surv .l { color:var(--warn); }
+  .anchor { font-family:var(--mono); font-size:.72rem; color:var(--dim); word-break:break-all; margin-top:12px; }
+  .badge-img { height:20px; vertical-align:middle; }
+  .step { counter-reset: s; list-style:none; padding:0; margin:0; }
+  .step li { position:relative; padding:2px 0 16px 34px; }
+  .step li::before { counter-increment:s; content:counter(s); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%; background:var(--acc); color:#06281d; font-weight:700; font-size:.8rem; display:grid; place-items:center; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>witness<span class="dot">.</span></h1>
-  <p class="tag">A deterministic build gate — catch test-theatre and throw-on-malformed <em>before</em> you push.</p>
+  <p class="tag">A drop-in CI gate that proves your tests actually have <strong>teeth</strong> — and mints a receipt anyone can re-run.</p>
   <a class="live" href="https://github.com/sjgant80-hub/witness">github.com/sjgant80-hub/witness →</a>
+  <a class="live" href="https://github.com/sjgant80-hub/witness/actions/workflows/landing.yml">re-run the landing →</a>
 
-  <p class="lead">Four adversarial LLM audit passes across the estate kept surfacing the <strong>same two
-  bug classes</strong>, build after build. Auditing for them cost ~1.5M tokens each time and still missed
-  some. Both are catchable <strong>deterministically</strong>, for free, in seconds — no language model,
-  no network, zero dependencies.</p>
+  <p class="lead">A green test suite tells you the tests <em>ran</em>, not that they'd <em>catch a regression</em>.
+  witness flips one operator per line of your source — <code>&gt;</code>→<code>&gt;=</code>, <code>&amp;&amp;</code>→<code>||</code> —
+  and reruns <strong>your own tests</strong>. A mutant that survives is a line your suite can't tell from a bug:
+  <em>test-theatre</em>. The pass is an un-forgeable, re-runnable <strong>Proof-of-Play</strong> receipt. No LLM, zero dependencies.</p>
+
+  <h2>Landed on real external code</h2>
+  <div class="land" id="land">
+    <div class="hdr">
+      <span class="repo">vercel/ms</span>
+      <span class="pill">pinned @ 1c6264b</span>
+      <span class="pill">~250M downloads/week</span>
+      <span class="pill" id="badge-pill">loading receipt…</span>
+    </div>
+    <p style="margin:12px 0 0;color:var(--dim);font-size:.95rem">We pointed witness at a battle-tested library nobody in our org wrote, and ran it against the library's own 49-test suite. The result is whatever the rail honestly found — reproduced on GitHub's runner, anchored by a hash:</p>
+    <div class="stat" id="stat"></div>
+    <div id="survivors"></div>
+    <div class="anchor" id="anchor"></div>
+  </div>
+
+  <h2>Add it to your CI in 60 seconds</h2>
+  <ol class="step">
+    <li>Drop a <code>witness.bench.json</code> in your repo — the whole integration is this one file:
+<pre><code>{ <span class="c-dim">"files"</span>: [<span class="c-kill">"src/index.js"</span>],
+  <span class="c-dim">"testCommand"</span>: <span class="c-kill">"npm test"</span> }</code></pre></li>
+    <li>Add one step to your workflow:
+<pre><code><span class="c-dim">- name: witness — proof of play</span>
+  uses: <span class="c-kill">sjgant80-hub/witness@v1</span></code></pre></li>
+    <li>CI now fails on test-theatre and uploads a <strong>Proof-of-Play</strong> receipt + a step summary + a badge — every run.</li>
+  </ol>
 
   <div class="grid">
     <div class="card">
-      <h3>Mutation gate <span class="k">witness mutate</span></h3>
-      <p>Flip one operator in the source — <code>&gt;</code>→<code>&gt;=</code>, <code>&amp;&amp;</code>→<code>||</code>,
-      <code>return true</code>→<code>return false</code> — then run the project's own tests. If they still
-      pass, that line is <em>test-theatre</em>: a hole a real regression falls straight through.</p>
+      <h3>Mutation gate <span class="k">the teeth test</span></h3>
+      <p>Flip one operator and run your tests. Still green? That line is unguarded — a hole a real regression falls straight through. It even refuses a file with nothing to mutate, or a red baseline: an empty run is not a pass.</p>
     </div>
     <div class="card">
-      <h3>Fuzz gate <span class="k">witness fuzz</span></h3>
-      <p>Throw the hostile-input battery — <code>null</code>, <code>BigInt</code>, a circular object, a
-      toxic getter, a 200k-element array — at a function. If a <em>tolerant</em> function throws, it fails
-      the never-throw boundary contract.</p>
+      <h3>Proof-of-Play <span class="k">un-forgeable</span></h3>
+      <p>The verdict is content-addressed over your code, your tests, and the gate itself. The receipt carries that hash. Re-run on any clean machine and it reproduces — paste a passing hash onto a theatre repo and verification re-derives the real one. Refused.</p>
     </div>
   </div>
 
-  <h2>Use it</h2>
-<pre><code><span class="c-dim"># mutation gate: mutate a file, run the tests against each mutant</span>
-npx witness mutate src/thing.mjs
+  <h2>Why the receipt can't be faked</h2>
+  <p class="note">Authenticity rests on a reproducible hash, not a signer. <code>verify</code> re-runs the benchmark and
+  tells three refusals apart instead of calling everyone a forger: <strong>benchmark-changed</strong> (the gate moved — an
+  instrument fingerprint is baked into the proof), <strong>repository</strong> (your code moved — re-prove), and the
+  <strong>anchor</strong> that doesn't reproduce (the forgery shape). The gate turned on itself: mutation-gated in its own CI,
+  including the proof-of-play adapter.</p>
+<pre><code><span class="c-dim"># mint a receipt (one gate run)</span>
+npx witness-bench prove . <span class="c-dim">&gt; receipt.json</span>
 
-<span class="c-dim"># fuzz gate: throw the hostile battery at one exported function</span>
-npx witness fuzz ./src/thing.mjs verifyThing</code></pre>
-
-  <p class="c-dim">Exit code <code>0</code> when the gate is clean, non-zero when it isn't — drop it
-  straight into CI.</p>
+<span class="c-dim"># anyone re-verifies — re-runs the gate, checks the anchor</span>
+node verify receipt.json .   <span class="c-kill">✓ AUTHENTIC</span>
+<span class="c-dim"># tampered anchor / wrong repo</span>              <span class="c-bad">✗ REFUSED</span></code></pre>
 
   <h2>The lesson it caught in itself</h2>
-  <p class="note">witness spawns your project's test runner. The first time it ran under its <em>own</em>
-  <code>node --test</code> suite, every mutant falsely "survived" — the spawned <code>node --test</code>
-  inherited <code>NODE_TEST_CONTEXT</code> from the parent and exited <code>0</code> even on failure. And
-  a hard kill mid-run once left a live mutant baked into a fixture. Both are now designed out — the child
-  env is scrubbed, and the gate self-heals from a sidecar backup after any interrupt. A build gate has to
-  be hardened against the exact bug classes it hunts. This one is dogfooded on itself.</p>
-
-  <h2>Verdict shape</h2>
-<pre><code>runMutations(src) <span class="c-dim">→</span> {
-  total: 14, killed: <span class="c-kill">14</span>, survived: <span class="c-kill">[]</span>,
-  score: <span class="c-kill">1.0</span>, clean: <span class="c-kill">true</span>
-}
-fuzz(verifyThing) <span class="c-dim">→</span> {
-  throwsOn: <span class="c-warn">[{ input: 'circular object', error: '…' }]</span>,
-  neverThrows: <span class="c-warn">false</span>
-}</code></pre>
+  <p class="note">witness spawns your test runner. The first time it ran under its <em>own</em> <code>node --test</code>
+  suite, every mutant falsely "survived" — the child inherited <code>NODE_TEST_CONTEXT</code> and exited <code>0</code> even on
+  failure. A hard kill mid-run once baked a live mutant into a fixture. Both are designed out now: the child env is scrubbed and
+  the gate self-heals from a sidecar after any interrupt. A build gate has to be hardened against the exact bug classes it hunts.</p>
 
   <footer>
-    Part of the estate · zero dependencies · MIT ·
-    <a href="https://github.com/sjgant80-hub/witness">source</a>
+    Part of the estate · zero dependencies · MIT · composes
+    <a href="https://github.com/sjgant80-hub/proof-of-play">proof-of-play</a> (the receipt) ·
+    <a href="https://github.com/sjgant80-hub/witness">source</a> ·
+    <a href="https://github.com/sjgant80-hub/witness/actions/workflows/landing.yml">re-run the landing</a>.
+    Landing subject: <a href="https://github.com/vercel/ms">vercel/ms</a> (MIT), used unmodified as an external test subject.
   </footer>
 </div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+try {
+  const v = await (await fetch('./landing/ms-verdict.json?cb=' + Date.now())).json();
+  const s = v.summary;
+  const clean = v.badge === true;
+  const bp = $('#badge-pill');
+  bp.textContent = clean ? 'badge: tests have teeth ✓' : `${s.survived} surviving mutant(s)`;
+  bp.style.color = clean ? 'var(--kill)' : 'var(--warn)';
+  bp.style.borderColor = clean ? 'var(--kill)' : 'var(--warn)';
+  $('#stat').innerHTML = `
+    <div><b class="${clean ? 'c-kill' : 'c-warn'}">${s.killed}/${s.mutants}</b><span>mutants killed</span></div>
+    <div><b>${s.score}</b><span>mutation score</span></div>
+    <div><b class="${s.survived ? 'c-warn' : 'c-kill'}">${s.survived}</b><span>surviving (test-theatre)</span></div>`;
+  const survs = (s.perFileReport || []).flatMap((f) => (f.survivors || []).map((x) => ({ file: f.file, ...x })));
+  if (survs.length) {
+    $('#survivors').innerHTML = '<div class="surv">' + survs.map((x) =>
+      `<div><span class="l">${esc(x.file)}:${x.line}</span> &nbsp;${esc(x.mutation)} &nbsp;<span class="c-dim">${esc(x.snippet)}</span></div>`).join('') +
+      '<div class="c-dim" style="margin-top:8px">These are unguarded boundaries — the suite never pins them, so a one-operator change slips through. Real, low-drama, exactly what the gate is for.</div></div>';
+  }
+  $('#anchor').textContent = 'anchor ' + v.hash;
+} catch (e) {
+  $('#badge-pill').textContent = 'receipt unavailable';
+}
+</script>
 </body>
 </html>
