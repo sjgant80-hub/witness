@@ -16,6 +16,19 @@ boundary). Not bugs — exactly the test-theatre the gate exists to surface. Rep
 by the [`landing` workflow](../../actions/workflows/landing.yml); the receipt's anchor reproduces or it is
 refused. See [`landing/`](landing/).
 
+### Verify-as-a-tool (the server, key-ready)
+
+`server/` turns the gate into a tool agents call: REST (`POST /verify`) and MCP (JSON-RPC at `/` —
+tools `quote` + `verify_repo`). Hand it a repo pinned to an exact commit; it clones, runs the gate
+against the repo's own tests, and returns the receipt **plus the exact steps to reproduce the verdict
+without us**. Branch refs are refused (verdicts must reproduce); unknown repos are refused outside
+`RUNNER_MODE=container` (running a stranger's tests is running a stranger's code — isolation is the
+deployment's job, and the default says so instead of pretending). Payments are a built, tested seam —
+Stripe Checkout → `/redeem` → bearer HMAC credit tokens — that stays **honestly inactive** until the
+owner sets `STRIPE_SECRET_KEY` + `PRICE_CENTS` + `CREDIT_SECRET`; until then `/verify` is free and the
+`/quote` says exactly that. Start: `node server/http.mjs` (defaults to `127.0.0.1:8794`). All three
+kernels are mutation-gated clean in CI (`server-gate`).
+
 ### Add it to your CI in 60 seconds
 
 ```jsonc

@@ -70,6 +70,21 @@ jobs:
       - name: witness gates its proof-of-play adapter
         run: node witness.mjs mutate witness-bench.mjs --cap 200 --timeout 600000 --test node --test witness-bench.test.mjs
 
+  # The verify-as-a-tool server kernels: the payment seam and the request/credit logic are part of
+  # the trust rail the moment an agent can pay through them, so they face the same bar.
+  server-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: witness gates the verify server core
+        run: node witness.mjs mutate server/verify-core.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs
+      - name: and gates the payment seam
+        run: node witness.mjs mutate server/payments.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs
+
   action-dogfood:
     runs-on: ubuntu-latest
     steps:

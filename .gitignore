@@ -6,3 +6,5 @@ _benchgate*
 _proof/
 _ci/
 _ext/
+_srv*.log
+_gate-*.json
