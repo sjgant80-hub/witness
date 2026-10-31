@@ -1,0 +1,17 @@
+{
+  "name": "witness-mutation-gate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "witness v0.6 as an agent skill: the mutation gate and fuzz gate on the user's own code, with a re-runnable receipt.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "agensi": { "allow": ["child_process", "file-writes", "env"] },
+  "scripts": {
+    "build": "node build-skill.mjs",
+    "test": "node --test kernel.test.mjs bundle.test.mjs",
+    "zip": "node make-zip.mjs",
+    "gate": "node gate.mjs --witness ../../witness/witness.mjs",
+    "verify-receipt": "node gate.mjs --verify"
+  }
+}

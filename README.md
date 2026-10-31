@@ -201,3 +201,18 @@ stops applying the instant that line changes. **You cannot baseline away a futur
 - **Async-aware fuzz** — awaits the function, so an `async` throw is still caught.
 
 Zero dependencies. Deterministic. MIT.
+
+## Use it from an agent: the witness-mutation-gate skill
+
+`skill/` packages witness v0.6 as an agent skill in the open SKILL.md format (Claude Code, Codex CLI, Cursor and
+others read it), for the Agensi skill marketplace. The skill script is one file,
+`skill/scripts/witness-mutation-gate.mjs`, because a skill script runs on its own: `skill/build-skill.mjs` builds
+it from the `v0.6` tag (witness.mjs and runner.mjs, pinned by SHA-256) with four mechanical changes listed in its
+header, and adds a `receipt` command that prints a re-runnable receipt for one gate run.
+
+- `skill/bundle.test.mjs` runs v0.6's own test suite against the one-file script, in a folder with no runner.mjs.
+- The receipt layer (`skill/kernel.mjs`) is mutation-gated by witness v0.6: `skill/receipts/witness.json`.
+- `.github/workflows/skill.yml` re-checks all of it on every push and builds the Agensi ZIP
+  (`node skill/make-zip.mjs`, run from `skill/`), printing its SHA-256.
+
+Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence.

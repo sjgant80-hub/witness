@@ -1,0 +1,24 @@
+{
+ "kind": "witness-mutation-gate.witness",
+ "v": 1,
+ "witness": {
+  "tag": "v0.6",
+  "commit": "f04fe3047e3d49b98c67713befd5b77182afa0d4",
+  "sha256": "9918297aa5f8fc4e1d26d9e6b25226f56102fdc04f0c634155bfcba1c086ef48"
+ },
+ "kernel": "kernel.mjs",
+ "kernelSha256": "725d9afe464da5faf243cbb91813d3942699cc21fb462d9b5d0e68c9e035ee36",
+ "tests": "node --test kernel.test.mjs",
+ "testsSha256": "db3ef2effe85d62ce8991f478aa09af3bbb4f02a3b5713b8189fdfadeafa091c",
+ "node": "v25.7.0",
+ "platform": "win32",
+ "total": 9,
+ "killed": 9,
+ "survived": [],
+ "ignored": [],
+ "capped": false,
+ "timeoutMs": 60000,
+ "clean": true,
+ "seconds": 19,
+ "rerun": "git clone https://github.com/sjgant80-hub/witness && git -C witness checkout v0.6 && node gate.mjs --witness witness/witness.mjs"
+}
