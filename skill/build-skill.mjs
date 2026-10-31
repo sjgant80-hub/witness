@@ -33,6 +33,20 @@ function replaceOnce(text, from, to) {
   return text.slice(0, i) + to + text.slice(i + from.length);
 }
 
+// Replace "estate" with "project" on comment lines only, asserting the exact number of lines touched and
+// that no code line contains the word (so the code itself stays byte-identical to v0.6).
+function commentWording(code, expectedLines) {
+  let touched = 0;
+  const out = code.split('\n').map((line) => {
+    if (!/\b[Ee]state\b/.test(line)) return line;
+    if (!/^\s*\/\//.test(line)) throw new Error('"estate" outside a comment line: ' + line.trim().slice(0, 90));
+    touched++;
+    return line.replace(/\bestate\b/g, 'project').replace(/\bEstate\b/g, 'Project');
+  });
+  if (touched !== expectedLines) throw new Error(`expected ${expectedLines} comment lines with "estate", found ${touched}`);
+  return out.join('\n');
+}
+
 function stripImports(code, from) {
   return code.split('\n').filter((l) => !l.startsWith('import ') || !l.includes(from)).join('\n');
 }
@@ -47,8 +61,12 @@ function bundle(witness, runner, kernel, cli) {
 
   const r = runner.replace(/\r\n/g, '\n');
   const argvLine = 'const [, , boundArg, ...cmd] = process.argv;';
-  const runnerBody = replaceOnce(r.slice(r.indexOf(argvLine)), argvLine,
+  let runnerBody = replaceOnce(r.slice(r.indexOf(argvLine)), argvLine,
     'const [, , , boundArg, ...cmd] = process.argv;   // argv[2] is --witness-runner');
+
+  // 5. v0.6's comments use an in-house word for the author's repositories; in comments only it reads "project".
+  w = commentWording(w, 8);
+  runnerBody = commentWording(runnerBody, 0);
 
   return [
     '#!/usr/bin/env node',
@@ -60,9 +78,10 @@ function bundle(witness, runner, kernel, cli) {
     '//   2. child_process also imports spawn, which runner.mjs needs.',
     '//   3. v0.6\'s entry guard is replaced by the DISPATCH at the end of the file, which compares real paths.',
     '//   4. Added: the `receipt` command (RECEIPT LAYER + RECEIPT MODE). It runs the same gate as `mutate`.',
+    '//   5. In comments only, the in-house word for the author\'s repositories now reads "project".',
     '// What it does on your machine: it edits the source file it gates, one mutant at a time, and always restores it',
     '// (a sidecar backup recovers a killed run); it runs the test command you give it. It makes no network calls.',
-    '// Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence.',
+    '// MIT licence.',
     '',
     '// ======== witness v0.6: witness.mjs ========',
     w.trimEnd(),

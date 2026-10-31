@@ -46,7 +46,7 @@ CI now fails on test-theatre and uploads a Proof-of-Play receipt + a step summar
 
 ## Why it exists
 
-Four adversarial LLM audit passes across the estate kept surfacing the **same two bug classes**, over and
+Four adversarial LLM audit passes across our repositories kept surfacing the **same two bug classes**, over and
 over, in build after build:
 
 1. **Test-theatre** — a test that stays green even when the behaviour it names is broken. The classic:
@@ -135,7 +135,7 @@ Two kinds of survivor are *not* test-theatre and can never be killed:
   ⚑ Comments used to be in that list, and the advice was "dismiss it". That was the tool documenting
   its own defect as your chore. An operator in a comment cannot be killed by any test, because
   changing it changes nothing — so it ALWAYS survived, and a file was reported as test-theatre
-  because of a sentence somebody wrote *about* the code. It bit seven repositories in this estate,
+  because of a sentence somebody wrote *about* the code. It bit seven of our repositories,
   always the same way: a comment explaining a defect quotes the offending expression, and the
   quotation becomes an unkillable survivor. That left two exits — delete the explanation, or baseline
   the mutant — and the second one trains people to talk the gate out of its verdict, which is the
@@ -182,7 +182,7 @@ stops applying the instant that line changes. **You cannot baseline away a futur
   printing a score; locally it left **301** node processes alive and turned a 3-hour run into a
   5-hour one. Orphans slow the machine, slow runs hit the wall, and a timed-out run orphans more —
   it compounds. With the sweep in place this repo's own suite went from 122s to 58s and leaks
-  nothing. (The estate had this recorded as a Windows quirk. It is not — the runner that died was
+  nothing. (We had this recorded as a Windows quirk. It is not — the runner that died was
   Linux; only the *repair* differs by platform.)
 - **The backup is written atomically** — it is what a killed run recovers from, and a half-written
   one is worse than none because the recovery applies it. ⚑ A truncated backup used to be copied

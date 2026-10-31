@@ -7,15 +7,16 @@
 //   2. child_process also imports spawn, which runner.mjs needs.
 //   3. v0.6's entry guard is replaced by the DISPATCH at the end of the file, which compares real paths.
 //   4. Added: the `receipt` command (RECEIPT LAYER + RECEIPT MODE). It runs the same gate as `mutate`.
+//   5. In comments only, the in-house word for the author's repositories now reads "project".
 // What it does on your machine: it edits the source file it gates, one mutant at a time, and always restores it
 // (a sidecar backup recovers a killed run); it runs the test command you give it. It makes no network calls.
-// Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence.
+// MIT licence.
 
 // ======== witness v0.6: witness.mjs ========
 // ════════════════════════════════════════════════════════════════
 // witness · a deterministic build gate — catch test-theatre and throw-on-malformed BEFORE you push
 //
-// Four adversarial LLM audit passes across the estate found two classes of problem over and over:
+// Four adversarial LLM audit passes across the project found two classes of problem over and over:
 //   1. TEST-THEATRE — a test that stays green even when the behaviour it names is broken.
 //   2. THROW-ON-MALFORMED — a validate/verify/classify function that crashes on hostile input
 //      (null, BigInt, circular, a toxic getter, a huge array) instead of returning a safe result.
@@ -25,7 +26,7 @@
 //   • FUZZ gate — throw the hostile-input battery at a function. If it throws, it fails the never-throw
 //     boundary contract.
 //
-// This is the witness discipline baked into the forge, so the estate stops needing a 1.5M-token audit
+// This is the witness discipline baked into the forge, so the project stops needing a 1.5M-token audit
 // per build. Zero dependencies (Node only — spawns the project's own test runner). Deterministic.
 // ════════════════════════════════════════════════════════════════
 
@@ -76,7 +77,7 @@ function loadBaseline(opts, srcPath, cwd) {
   return { sigs, rejected };
 }
 
-// An exemption shorter than this is not an argument. The estate's own rule: under twenty characters
+// An exemption shorter than this is not an argument. The project's own rule: under twenty characters
 // is a shrug, not an excuse.
 export const MIN_REASON_CHARS = 20;
 
@@ -108,7 +109,7 @@ export const OPERATORS = [
 // survives, and witness reports the file as test-theatre on the strength of a sentence somebody
 // wrote about the code.
 //
-// That is not a cosmetic annoyance. It has bitten seven repositories in this estate, always the
+// That is not a cosmetic annoyance. It has bitten seven repositories in this project, always the
 // same way: a comment explaining a defect quotes the offending expression, and the quotation
 // becomes an unkillable survivor. The gate then says THEATRE about a suite that is fine, which
 // leaves two exits — delete the explanation, or baseline the mutant. Both are worse than the
@@ -218,7 +219,7 @@ export function mutants(source) {
 // CRASH-SAFE. `finally` restores on a normal finish or a thrown error, but NOT on SIGTERM/SIGKILL — a
 // hard kill mid-run would leave srcPath holding a live mutant (this actually happened while dogfooding
 // witness on itself). So before mutating we drop a sidecar backup holding the true original; if a prior
-// run was killed, that backup is still on disk and we self-heal from it on the next run. The estate can
+// run was killed, that backup is still on disk and we self-heal from it on the next run. The project can
 // never be left silently corrupted by an interrupted gate.
 // opts: { testCmd?: string[], cwd?: string, cap?: number, timeout?: number, baseline?: string|array }
 // ── run the suite once, and leave nothing behind ─────────────────────────────
@@ -232,7 +233,7 @@ export function mutants(source) {
 // runner leaked 324 processes — 164 node, 82 npm, 78 sh — and the job was SIGTERMed at 75 minutes
 // having never printed a score. The same leak locally left 301 node processes alive and turned a
 // 3-hour run into a 5-hour one: orphans slow the machine, slow runs hit the wall, timed-out runs
-// orphan more. It compounds. The estate had this written down as a Windows quirk. It is not — the
+// orphan more. It compounds. The project had this written down as a Windows quirk. It is not — the
 // runner that died was Linux.
 //
 // The fix is to make the child a process-group leader (`detached`) and then kill the GROUP once the
@@ -342,7 +343,7 @@ export function runMutations(srcPath, opts = {}) {
   // backup on disk. The next run then dutifully copied that truncation over the real source. An empty
   // backup emptied the file. It happened to this repo's own fixture, and the run that did it went on
   // to report a clean gate, because a file with nothing in it has no mutants and no mutants used to
-  // score 1.0 (see below). "The estate can never be left silently corrupted by an interrupted gate"
+  // score 1.0 (see below). "The project can never be left silently corrupted by an interrupted gate"
   // was the promise directly above this line.
   //
   // Two changes. The backup is now written atomically — to a temp file, then renamed, so it either
@@ -388,7 +389,7 @@ export function runMutations(srcPath, opts = {}) {
     // A timed-out run counts as KILLED, which is right for a mutant that hangs and catastrophic for
     // one that was merely slow: a suite slower than the bound makes EVERY mutant time out, so the
     // gate scores a perfect 100% having proved nothing at all. It is the worst kind of false clean,
-    // because the number it produces is the best possible one. The estate has already been bitten:
+    // because the number it produces is the best possible one. The project has already been bitten:
     // a repo with real filesystem fixtures ran 16s typical and 37s under load against a 20s wall.
     // This file's own suite now takes ~107s, and gating it with the 20s default would have reported
     // a flawless score from a run in which not one test ever finished.
