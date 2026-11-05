@@ -287,6 +287,9 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
       <tr><td class="f">skill/</td><td>witness as an agent skill: one self-contained file built from the v0.6 tag, plus a receipt command.</td><td id="bp-skill">…</td></tr>
       <tr><td class="f">landing/</td><td>The external proof on vercel/ms and <code>check.mjs</code>, which fails the monthly run unless it reproduces the committed anchor.</td><td id="bp-landing">…</td></tr>
       <tr><td class="f">witness.baseline.json</td><td>The reviewed exemptions for witness's own gate, each with its argued reason.</td><td id="bp-baseline">…</td></tr>
+      <tr><td class="f">tools/mask-bounds.mjs</td><td>The differential run behind the baselined loop bounds in the masker: it builds the masker from the served <code>witness.mjs</code>, flips each bound, and compares the masks over every short input and a seeded random set, with a control it must detect.</td><td><small>runs in the <code>test</code> job on Linux, macOS and Windows on every push; any differing mask fails the build</small></td></tr>
+      <tr><td class="f">receipts/stamp.mjs</td><td>Wraps each CI gate's verdict in the receipt this table reads: the command, commit, run, runner and the SHA-256 of every file the run covered.</td><td><small>CI only; its output is what is checked against the served files above</small></td></tr>
+      <tr><td class="f">fixtures/</td><td>Small subjects the tests and <code>action-dogfood</code> gate: a one-operator boundary with a suite that pins it and one that does not, a binary search whose mutant never terminates, a deliberately slow suite for the timeout checks, and a fuzz pair (one function that tolerates hostile input, one that throws).</td><td><small>used by the test suite and by <code>action-dogfood</code></small></td></tr>
     </tbody>
   </table></div>
   </section>
