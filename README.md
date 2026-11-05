@@ -171,7 +171,12 @@ function that throws on hostile input (`action-dogfood`).
   committed one, and says whether a mismatch is the gate changing or the result changing (`landing/check.mjs`).
   Its first run under v0.7 said INSTRUMENT CHANGED, because the anchor covers witness.mjs; the verdict was the same
   (15 killed, 2 survived). The landing was re-minted from that run's artifact and the earlier receipt kept, with its
-  reason, under `landing/history/`.
+  reason, under `landing/history/`; the next run said REPRODUCED, its receipt byte for byte the committed one
+  (see [`landing/`](landing/)).
+- **The suite runs on Linux, macOS and Windows.** Until v0.7 CI ran it on Linux only, while the entry-guard fix is
+  about macOS's symlinked temp folder and the spawn path has a Windows and a POSIX branch. The `test` job is now a
+  matrix of all three.
+- **[SECURITY.md](SECURITY.md)** says how to report a vulnerability privately, and what the gate does on your machine.
 - **Every CI gate keeps a receipt.** Each gate job writes witness's verdict with the commit, run, runner and the SHA-256
   of every file it covered (`receipts/stamp.mjs`); the receipts are committed under `receipts/ci/` and the live page
   shows a result only while the files it serves still hash the same.

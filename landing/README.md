@@ -35,7 +35,9 @@ The entire integration is one file dropped into the subject at CI time:
   run's `witness-verdict.json` byte for byte. Its `witness-receipt.json` differs from `ms-receipt.json` in one field:
   the run cloned the library into a folder named `_ext`, and the receipt records the folder's name as the repo. The
   anchor does not cover that field, so the hash is the same. The workflow now clones into `ms`, the name the earlier
-  receipt carried, so every later run's receipt can equal the committed one byte for byte.
+  receipt carried. The next run, [42089760341](https://github.com/sjgant80-hub/witness/actions/runs/42089760341) on
+  commit `00b8ffe`, said **REPRODUCED**, and its `witness-receipt.json` and `witness-verdict.json` equal
+  `ms-receipt.json` and `ms-verdict.json` byte for byte.
 
 ## History (`history/`)
 
