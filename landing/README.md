@@ -6,7 +6,8 @@ source, reproduced on GitHub's runner, anchored by a hash.
 
 ## Subject
 
-- **Library:** [vercel/ms](https://github.com/vercel/ms) — MIT, ~250M downloads/week.
+- **Library:** [vercel/ms](https://github.com/vercel/ms) — MIT; 724,433,326 npm downloads in the week
+  2026-10-29 to 2026-11-04 ([npm's downloads API](https://api.npmjs.org/downloads/point/last-week/ms)).
 - **Pinned commit:** `1c6264b795492e8fdecbc82cb8802fcfbfc08d26` (v2.1.3).
 - **Used unmodified** as an external test subject. All credit to its authors; witness only reads and
   mutates a working copy, restoring it byte-for-byte.

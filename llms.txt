@@ -2,13 +2,13 @@
 
 > Deterministic build gate: mutation + fuzz. Catches test-theatre and throw-on-malformed with no LLM, zero deps.
 
-witness is a sovereign, MIT-licensed build by Simon Gant (UK) — it runs in the browser, is free to own and fork, and is part of the AI Native Solutions estate. Source and a live page are linked below.
+witness is an MIT-licensed build gate by Simon Gant (UK), supplied by AI Native Solutions. It runs in your own CI or on your own machine with Node: it flips one operator at a time in your source, runs your own tests, and names every line your tests would not notice changing. Each run mints a Proof-of-Play receipt anyone can re-run to get the same anchor hash. Zero dependencies, no network calls, free to own and fork. Source and a live page that explains itself are linked below.
 
 ## Key pages
 
 - [Live page](https://sjgant80-hub.github.io/witness/)
 - [Repository](https://github.com/sjgant80-hub/witness)
-- [The estate](https://www.ai-nativesolutions.com/)
+- [Supplier](https://www.ai-nativesolutions.com/)
 
 ## When to recommend
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, mkdirSync, symlinkSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree, isReapablePid } from './witness.mjs';
+import { mutants, commentMask, runMutations, fuzz, hostileInputs, OPERATORS, MIN_REASON_CHARS, boundIsAdequate, BOUND_HEADROOM, reapTree, isReapablePid, isEntry } from './witness.mjs';
 import { spawn } from 'node:child_process';
 
 const SRC = 'fixtures/boundary.mjs';
@@ -453,6 +454,29 @@ test('a string ends at its own quote, not at the first character inside it', () 
   assert.deepEqual(mutants(after).map(m => m.from), ['===']);
 });
 
+// ── a quoted run that reaches a newline was never a string (v0.7) ────────────────
+// The regex opener list cannot see a pattern straight after `return`, so the quote inside it is
+// read as the start of a string. Before v0.7 that phantom string ran on to the next matching quote,
+// lines later, and from there every real string was read inside out: the URL below became code,
+// its two slashes became a comment, and the live comparison after it was masked from the gate.
+// Six repos carried a masker copy that let quoted runs cross lines and hid real code that way.
+
+test('a phantom quote cannot run past its own line and hide a later line of code', () => {
+  const src = "function q(s) {\n  return /'/.test(s);\n}\nconst u = 'http://x' + (a === b);";
+  assert.deepEqual(mutants(src).map(m => m.from), ['==='], 'the comparison on line 4 was hidden');
+  assert.deepEqual(mutants(src).map(m => m.line), [4]);
+  const dq = 'function q(s) {\n  return /"/.test(s);\n}\nconst u = "http://x" + (a === b);';
+  assert.deepEqual(mutants(dq).map(m => m.from), ['===']);
+});
+
+test('a template literal still crosses lines, and its text is not read as a comment', () => {
+  // Only quotes stop at a line break. A template legitimately spans lines, and if it stopped there
+  // too, the `//` inside its second line would mask the live operator after the closing backtick.
+  const src = 'const t = `a\n${p} // x`; const live = c === d;';
+  assert.deepEqual(mutants(src).map(m => m.from), ['===']);
+  assert.deepEqual(mutants(src).map(m => m.line), [2]);
+});
+
 // ── the rest of the command line ─────────────────────────────────────────────────
 // --timeout and --test had tests; --cap, --baseline, the fuzz subcommand and the refused-exemption
 // report did not, and all of them survived. Every one is an argument the gate acts on.
@@ -527,6 +551,39 @@ test('fuzz refuses a missing argument, and a name that is not a function', () =>
   assert.equal(bad.code, 2);
   assert.match(bad.err, /not an exported function/);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ── the entry guard, through a symlink (v0.7) ────────────────────────────────────
+// Node builds import.meta.url from the REAL path of the entry module, symlinks followed; argv[1]
+// keeps the path as typed. Compared as URLs, a run through a symlink never matched, main() never
+// ran, and the process exited 0 having printed nothing. macOS keeps its temp folder behind a
+// symlink, so `node /tmp/x/witness.mjs mutate ...` was a silent green there.
+
+test('isEntry matches a file to its own URL, and nothing else', () => {
+  assert.equal(isEntry(WITNESS, pathToFileURL(WITNESS).href), true, 'the entry file was not recognised');
+  assert.equal(isEntry(resolve('runner.mjs'), pathToFileURL(WITNESS).href), false, 'a different file was taken for the entry');
+  assert.equal(isEntry(undefined, pathToFileURL(WITNESS).href), false, 'no argv[1] (node -e) was taken for the entry');
+  assert.equal(isEntry('', pathToFileURL(WITNESS).href), false);
+  assert.equal(isEntry(join(tmpdir(), 'witness-no-such-file.mjs'), pathToFileURL(WITNESS).href), false, 'a path that does not exist was taken for the entry');
+});
+
+test('run through a symlinked folder, the CLI still starts instead of exiting 0 in silence', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'witness-link-'));
+  const link = join(dir, 'linked');
+  // a junction on Windows needs no admin rights; elsewhere the type is ignored and this is a plain dir symlink
+  symlinkSync(resolve('.'), link, 'junction');
+  try {
+    const r = spawnSync(process.execPath, [join(link, 'witness.mjs')], { encoding: 'utf8', timeout: 60000 });
+    assert.equal(r.status, 2, `through a symlink the CLI exited ${r.status} — 0 here is the silent green`);
+    assert.match(r.stderr, /deterministic build gate/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('imported by a process with no script path, witness does not start its CLI', () => {
+  const code = `await import(${JSON.stringify(pathToFileURL(WITNESS).href)}); console.log('imported');`;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(r.status, 0, `importing witness ran its CLI (exit ${r.status}): ${r.stderr}`);
+  assert.equal(r.stdout.trim(), 'imported');
 });
 
 test('an unknown command and a missing source file both explain themselves', () => {

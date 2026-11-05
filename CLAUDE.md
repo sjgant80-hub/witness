@@ -23,7 +23,7 @@ pair — each pins a bug that actually happened while building witness. Add a te
 the incident, then fix.
 
 ## Run
-- `npm test` — the suite (12 tests).
+- `npm test` — the suite (witness, the bench adapter, the server kernels and the cost case).
 - `node witness.mjs mutate <file>` — mutation gate (exit non-zero ⇒ survivors).
 - `node witness.mjs fuzz <module.mjs> <fnName>` — fuzz gate (exit non-zero ⇒ throws on hostile input).
 

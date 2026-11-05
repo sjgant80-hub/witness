@@ -16,7 +16,11 @@ next to the source (or in `cwd`) is auto-loaded.
 3. Enumerate mutants of `original`: for each spaced-operator occurrence **outside a comment**, one
    single-point mutation. Comment regions (`//` to end of line, `/*` to `*/`, unterminated block
    comments to end of file) are found by a character scan that tracks string literals and escapes, so
-   a comment marker inside a string does not blind the mutator to real code after it. An operator in a
+   a comment marker inside a string does not blind the mutator to real code after it. A regex literal
+   after an unambiguous opener is stepped over, so `/\//` is not read as a comment. A single- or
+   double-quoted run that reaches an unescaped line break ends there (v0.7): such a string cannot exist
+   in JavaScript, so the quote never opened one, and letting it run on would turn the rest of the file
+   inside out and mask live code as comment. Template literals still span lines. An operator in a
    comment cannot change behaviour, so such a mutant can never be killed and its survival is not
    evidence about the tests. String literals ARE mutated: a change inside a string changes the
    program, so a surviving string mutant is weak evidence but still evidence.

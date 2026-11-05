@@ -15,9 +15,9 @@
 // per build. Zero dependencies (Node only — spawns the project's own test runner). Deterministic.
 // ════════════════════════════════════════════════════════════════
 
-import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, renameSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 // A reviewed-equivalent baseline. Mutation testing has a well-known floor: some mutants are EQUIVALENT
@@ -169,6 +169,16 @@ export function commentMask(source) {
       while (i < src.length) {
         if (src[i] === '\\') { i += 2; continue; }
         if (src[i] === quote) { i += 1; break; }
+        // ⚑ A QUOTE THAT REACHES A NEWLINE NEVER OPENED A STRING. In JavaScript a single- or
+        // double-quoted string cannot cross an unescaped line break (only a template can), so a run
+        // that gets here started at a quote that was not a string at all. The usual source is a
+        // regex the opener list cannot see, such as a quote character in a pattern straight after the
+        // return keyword. Left running, that phantom string flips the scanner's sense of what is a
+        // string for the rest of the file, and the next real string holding two slashes is then
+        // read as a comment that masks live code to the end of its line. Six repos carried their
+        // own copies of a masker that let quoted runs cross lines, and each hid real code from the
+        // gate that way. Stopping at the line break keeps any mis-read to the one line it began on.
+        if (src[i] === chr10 && quote !== '`') break;
         i += 1;
       }
       prev = c;
@@ -545,8 +555,20 @@ async function main() {
 // exit 0, on a file with a live surviving mutant.
 //
 // Canonical URLs on both sides, so there is nothing left to hand-build wrongly.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+//
+// ⛑ AND THE CANONICAL URLS WERE STILL TWO SPELLINGS OF ONE FILE. Node resolves the entry module to
+// its REAL path, symlinks followed, before it builds import.meta.url, while process.argv[1] keeps
+// the path as it was typed. Run witness through a symlink and the two never match: macOS keeps
+// its temp folder behind one, a Windows junction is one, so is a symlinked checkout or a package
+// store. main() was never called and the process exited 0, printing nothing, which is the same
+// silent green as above by a second road. Reproduced on this repo through a junction on
+// 2026-11-04: no banner, no usage line, exit 0. Real paths on both sides now. A path that cannot be
+// resolved names no file on disk, so it cannot be this one.
+export function isEntry(argv1, moduleUrl) {
+  if (!argv1) return false;
+  try { return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl)); }
+  catch { return false; }
 }
+if (isEntry(process.argv[1], import.meta.url)) main();
 
 export default { mutants, runMutations, fuzz, OPERATORS, hostileInputs };

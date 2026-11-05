@@ -21,6 +21,10 @@ inputs:
     description: 'Per-mutant timeout in ms (must clear the suite comfortably; the gate refuses a bound under 2x the baseline).'
     required: false
     default: '600000'
+  fuzz:
+    description: 'Optional fuzz targets: space/newline-separated module.mjs:exportName pairs. Each function gets the hostile-input battery and must never throw.'
+    required: false
+    default: ''
   node-version:
     description: 'Node version to run the gate under.'
     required: false
@@ -61,6 +65,21 @@ runs:
           echo "hash=$hash" >> "$GITHUB_OUTPUT"
         fi
         exit $code
+    # v0.6 had this input and the proof-of-play rewrite dropped it while the README still documented it,
+    # so a workflow that named fuzz targets silently stopped fuzzing them. Restored in v0.7.
+    - name: witness fuzz gate
+      if: ${{ inputs.fuzz != '' }}
+      shell: bash
+      env:
+        WITNESS_FUZZ: ${{ inputs.fuzz }}
+      run: |
+        set -e
+        for pair in $WITNESS_FUZZ; do
+          mod="${pair%%:*}"; fn="${pair##*:}"
+          echo "::group::witness · fuzz gate · $mod :: $fn"
+          node "${{ github.action_path }}/witness.mjs" fuzz "$mod" "$fn"
+          echo "::endgroup::"
+        done
     - name: upload the proof
       if: ${{ always() && inputs.upload-artifact == 'true' }}
       uses: actions/upload-artifact@v4

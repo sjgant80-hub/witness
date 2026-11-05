@@ -9,6 +9,10 @@ jobs:
         with:
           node-version: '20'
       - run: npm test
+      # Two baseline exemptions argue that flipping commentMask's loop bounds changes no mask. This re-runs that
+      # differential on every push (with a control it must detect), so the argument cannot go stale as the masker changes.
+      - name: the masker's baselined bounds are still equivalent
+        run: node tools/mask-bounds.mjs
 
   # ⚑ THE INSTRUMENT WAS NOT GATED BY ITS OWN CI. `npm test` ran, and the Action was dogfooded
   # against a fixture, but witness.mjs itself never faced a mutation gate — the one file the whole
@@ -39,7 +43,22 @@ jobs:
         with:
           node-version: '20'
       - name: witness gates itself
-        run: node witness.mjs mutate witness.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate witness.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs witness-gate gate.json "node witness.mjs mutate witness.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs" witness.mjs witness.test.mjs runner.mjs witness.baseline.json
+          exit $code
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-witness-gate
+          path: _receipts/
+          if-no-files-found: warn
 
   # runner.mjs enforces the bound and kills the tree. It is small, but it is the piece that
   # decides whether a run is counted KILLED — gating everything except the thing holding the
@@ -53,7 +72,22 @@ jobs:
         with:
           node-version: '20'
       - name: and gates its runner
-        run: node witness.mjs mutate runner.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate runner.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs runner-gate gate.json "node witness.mjs mutate runner.mjs --cap 400 --timeout 600000 --test node --test witness.test.mjs" runner.mjs witness.test.mjs witness.mjs witness.baseline.json
+          exit $code
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-runner-gate
+          path: _receipts/
+          if-no-files-found: warn
 
   # witness-bench.mjs is now part of the trust rail — it turns a mutation run into the proof-of-play
   # verdict that the receipt is minted from. The doctrine is the same as for witness.mjs: the
@@ -68,7 +102,22 @@ jobs:
         with:
           node-version: '20'
       - name: witness gates its proof-of-play adapter
-        run: node witness.mjs mutate witness-bench.mjs --cap 200 --timeout 600000 --test node --test witness-bench.test.mjs
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate witness-bench.mjs --cap 200 --timeout 600000 --test node --test witness-bench.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs bench-gate gate.json "node witness.mjs mutate witness-bench.mjs --cap 200 --timeout 600000 --test node --test witness-bench.test.mjs" witness-bench.mjs witness-bench.test.mjs witness.mjs witness.baseline.json
+          exit $code
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-bench-gate
+          path: _receipts/
+          if-no-files-found: warn
 
   # The verify-as-a-tool server kernels: the payment seam and the request/credit logic are part of
   # the trust rail the moment an agent can pay through them, so they face the same bar.
@@ -81,9 +130,69 @@ jobs:
         with:
           node-version: '20'
       - name: witness gates the verify server core
-        run: node witness.mjs mutate server/verify-core.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate server/verify-core.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs server-gate-verify-core gate.json "node witness.mjs mutate server/verify-core.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs" server/verify-core.mjs server/verify-core.test.mjs server/payments.test.mjs witness.mjs witness.baseline.json
+          exit $code
       - name: and gates the payment seam
-        run: node witness.mjs mutate server/payments.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate server/payments.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs server-gate-payments gate.json "node witness.mjs mutate server/payments.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs" server/payments.mjs server/verify-core.test.mjs server/payments.test.mjs witness.mjs witness.baseline.json
+          exit $code
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-server-gate
+          path: _receipts/
+          if-no-files-found: warn
+
+  # The cost case on the live page is case/witnesscase.mjs imported as is, so the numbers a buyer reads are the
+  # numbers this kernel computes from the vendored, sourced basis. It faces the same bar as the rest of the rail:
+  # its tests, a mutation gate with no exemptions (case/witness.baseline.json is an empty list, so the root
+  # baseline cannot leak into it), and the fuzz battery on every export.
+  case-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: the cost-case kernel's own tests
+        run: node --test case/witnesscase.test.mjs
+      - name: witness gates the cost-case kernel
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate case/witnesscase.mjs --cap 400 --timeout 120000 --test node --test case/witnesscase.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs case-gate gate.json "node witness.mjs mutate case/witnesscase.mjs --cap 400 --timeout 120000 --test node --test case/witnesscase.test.mjs" case/witnesscase.mjs case/witnesscase.test.mjs case/witness.baseline.json vendor/sovereign-enterprise/basis.json witness.mjs
+          exit $code
+      - name: and fuzzes every export (hostile input must never throw)
+        run: |
+          node witness.mjs fuzz case/witnesscase.mjs witnessCase
+          node witness.mjs fuzz case/witnesscase.mjs sourcesOf
+          node witness.mjs fuzz case/witnesscase.mjs over
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-case-gate
+          path: _receipts/
+          if-no-files-found: warn
 
   action-dogfood:
     runs-on: ubuntu-latest
@@ -96,3 +205,30 @@ jobs:
         with:
           files: fixtures/boundary.mjs
           test-command: node --test fixtures/boundary.good.test.mjs
+          fuzz: fixtures/fuzz.mjs:tolerant
+      # A gate that only ever passes has not been shown to gate anything. The same Action must FAIL a suite
+      # that never tests the zero boundary (test-theatre), and must FAIL a function that throws on hostile
+      # input. Each runs with continue-on-error and the next step asserts the failure actually happened.
+      - name: the Action on a theatre suite (must fail)
+        id: theatre
+        continue-on-error: true
+        uses: ./
+        with:
+          files: fixtures/boundary.mjs
+          test-command: node --test fixtures/boundary.theatre.test.mjs
+          upload-artifact: 'false'
+      - name: the Action on a function that throws (must fail)
+        id: brittle
+        continue-on-error: true
+        uses: ./
+        with:
+          files: fixtures/boundary.mjs
+          test-command: node --test fixtures/boundary.good.test.mjs
+          fuzz: fixtures/fuzz.mjs:brittle
+          upload-artifact: 'false'
+      - name: both refusals happened
+        shell: bash
+        run: |
+          echo "theatre: ${{ steps.theatre.outcome }} · brittle: ${{ steps.brittle.outcome }}"
+          test "${{ steps.theatre.outcome }}" = failure
+          test "${{ steps.brittle.outcome }}" = failure

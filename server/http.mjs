@@ -1,5 +1,5 @@
 // server/http.mjs · the surface: plain REST for any agent, MCP (JSON-RPC over POST) for MCP agents.
-// Zero dependencies. Start:  node server/http.mjs   (PORT, default 8791)
+// Zero dependencies. Start:  node server/http.mjs   (PORT, default 8794)
 //
 // KEY-READY MODES
 //   free (default, no keys):  /verify runs free within the allowlist and says so.

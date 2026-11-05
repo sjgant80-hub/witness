@@ -138,8 +138,10 @@ the composite inherits their soundness rather than hiding their faults.
 
 ```bash
 npm test                                  # 1. the suite is green
-npx witness mutate <EVERY source file>    # 2. no surviving mutants — gate every module, not just main
-npx witness fuzz <module> <tolerant fn>   # 3. tolerant fns show neverThrows:true
+node .witness/witness.mjs mutate <EVERY source file>    # 2. no surviving mutants — gate every module, not just main
+node .witness/witness.mjs fuzz <module> <tolerant fn>   # 3. tolerant fns show neverThrows:true
+# (.witness = git clone --depth 1 --branch v0.7 https://github.com/sjgant80-hub/witness.git .witness;
+#  never `npx witness`: that npm name belongs to an unrelated package)
 ```
 
 Then, by eye / by review:

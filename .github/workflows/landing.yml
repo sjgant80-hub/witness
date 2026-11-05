@@ -68,6 +68,10 @@ jobs:
           echo "anchor reproduces the committed landing when it equals:"
           node -e "process.stdout.write(require('$GITHUB_WORKSPACE/landing/ms-receipt.json').hash + '\n')"
 
+      - name: the anchor reproduces the committed landing (fails if not, and says why)
+        working-directory: _ext
+        run: node "$GITHUB_WORKSPACE/landing/check.mjs" witness-receipt.json "$GITHUB_WORKSPACE/landing/ms-receipt.json"
+
       - name: upload the external proof
         if: always()
         uses: actions/upload-artifact@v4

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>witness — prove your tests have teeth</title>
-<meta name="description" content="A drop-in CI gate that proves your tests actually catch regressions. A mutation gate flips one operator per line and runs your own tests; a surviving mutant is test-theatre. The pass is an un-forgeable, re-runnable Proof-of-Play receipt — paste a hash your code does not produce and verification refuses it. No LLM, zero dependencies. Shown landing on vercel/ms, a library downloaded ~250M times a week.">
+<meta name="description" content="A drop-in CI gate that proves your tests actually catch regressions. A mutation gate flips one operator per line and runs your own tests; a surviving mutant is test-theatre. The pass is an un-forgeable, re-runnable Proof-of-Play receipt — paste a hash your code does not produce and verification refuses it. No LLM, zero dependencies, no network calls. Shown landing on vercel/ms.">
 <meta name="color-scheme" content="dark light">
 <style>
   :root {
@@ -13,31 +13,40 @@
   }
   :root:not([data-theme="light"]){ color-scheme:dark; }
   @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) { --bg:#f7f9fb; --panel:#fff; --panel2:#f0f3f8; --ink:#141a21; --dim:#586470; --line:#e3e8ee; --acc:#12876a; --warn:#a5610f; --kill:#0d7a54; --bad:#c0392b; --live:#0369a1; }
+    :root:not([data-theme="dark"]) { --bg:#f7f9fb; --panel:#fff; --panel2:#f0f3f8; --ink:#141a21; --dim:#586470; --line:#e3e8ee; --acc:#12876a; --warn:#a5610f; --kill:#0d7a54; --bad:#c0392b; --live:#0369a1; color-scheme:light; }
   }
   :root[data-theme="dark"]{ --bg:#0d1017; --panel:#151a23; --panel2:#0e131b; --ink:#e6edf3; --dim:#9aa7b4; --line:#232a35; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
   .wrap { max-width: 840px; margin: 0 auto; padding: 56px 22px 80px; }
+  @media (max-width:520px){ .wrap { padding: 36px 16px 64px; } h1 { font-size: 2.1rem !important; } }
   h1 { font-size: 2.6rem; margin:0 0 4px; letter-spacing:-.02em; }
   h1 .dot { color:var(--acc); }
   .tag { color:var(--dim); font-size:1.12rem; margin:0 0 22px; }
-  .live { display:inline-block; margin:0 8px 34px 0; font-family:var(--mono); font-size:.82rem; color:var(--live); border:1px solid var(--line); border-radius:7px; padding:5px 11px; text-decoration:none; }
-  .live:hover { border-color:var(--live); }
-  h2 { font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:44px 0 14px; font-weight:600; }
+  .live { display:inline-block; margin:0 8px 12px 0; font-family:var(--mono); font-size:.82rem; color:var(--live); border:1px solid var(--line); border-radius:7px; padding:5px 11px; text-decoration:none; }
+  .live:hover, .live:focus-visible { border-color:var(--live); }
+  nav.toc { display:flex; flex-wrap:wrap; gap:6px 14px; margin:14px 0 30px; padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); font-size:.88rem; }
+  nav.toc a { color:var(--dim); text-decoration:none; }
+  nav.toc a:hover, nav.toc a:focus-visible { color:var(--live); }
+  h2 { font-size:1.02rem; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:48px 0 14px; font-weight:600; scroll-margin-top:16px; }
+  h3 { font-size:1.06rem; margin:26px 0 8px; }
   p { color:var(--ink); }
   .lead { font-size:1.12rem; }
+  .plain { background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--acc); border-radius:10px; padding:16px 18px; margin:18px 0; }
+  .plain p { margin:0 0 8px; } .plain p:last-child { margin:0; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; }
   .card h3 { margin:0 0 8px; font-size:1.05rem; }
   .card h3 .k { font-family:var(--mono); font-size:.8rem; color:var(--acc); }
   .card p { margin:0; color:var(--dim); font-size:.95rem; }
+  .card ul { margin:6px 0 0; padding-left:18px; color:var(--dim); font-size:.95rem; }
   pre { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:.86rem; line-height:1.7; }
   .c-dim { color:var(--dim); } .c-kill { color:var(--kill); } .c-warn { color:var(--warn); } .c-bad { color:var(--bad); }
-  code { font-family:var(--mono); font-size:.9em; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:1px 5px; }
-  pre code { background:none; border:0; padding:0; }
+  code { font-family:var(--mono); font-size:.9em; background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:1px 5px; overflow-wrap:anywhere; }
+  pre code { background:none; border:0; padding:0; overflow-wrap:normal; }
   .note { border-left:3px solid var(--acc); padding:6px 0 6px 16px; color:var(--dim); margin:16px 0; }
+  a { color:var(--live); }
   footer { margin-top:56px; padding-top:22px; border-top:1px solid var(--line); color:var(--dim); font-size:.85rem; }
   footer a { color:var(--live); }
   /* landing panel */
@@ -48,13 +57,52 @@
   .stat { display:flex; gap:26px; flex-wrap:wrap; margin:14px 0 6px; }
   .stat b { display:block; font-family:var(--mono); font-size:1.5rem; line-height:1.2; }
   .stat span { color:var(--dim); font-size:.8rem; }
-  .surv { font-family:var(--mono); font-size:.82rem; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:10px; }
+  .surv { font-family:var(--mono); font-size:.82rem; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:10px 12px; margin-top:10px; overflow-wrap:anywhere; }
   .surv .l { color:var(--warn); }
   .anchor { font-family:var(--mono); font-size:.72rem; color:var(--dim); word-break:break-all; margin-top:12px; }
-  .badge-img { height:20px; vertical-align:middle; }
   .step { counter-reset: s; list-style:none; padding:0; margin:0; }
-  .step li { position:relative; padding:2px 0 16px 34px; }
-  .step li::before { counter-increment:s; content:counter(s); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%; background:var(--acc); color:#06281d; font-weight:700; font-size:.8rem; display:grid; place-items:center; }
+  .step > li { position:relative; padding:2px 0 16px 34px; }
+  .step > li::before { counter-increment:s; content:counter(s); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%; background:var(--acc); color:#06281d; font-weight:700; font-size:.8rem; display:grid; place-items:center; }
+  /* diagram */
+  .fig { margin:18px auto 6px; max-width:540px; }
+  .fig svg { width:100%; height:auto; display:block; }
+  .fig figcaption { color:var(--dim); font-size:.85rem; margin-top:8px; text-align:center; }
+  svg .bx { fill:var(--panel); stroke:var(--line); stroke-width:1.5; }
+  svg .bx.acc { stroke:var(--acc); }
+  svg .bx.kill { stroke:var(--kill); }
+  svg .bx.warn { stroke:var(--warn); }
+  svg .t { fill:var(--ink); font:600 15px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  svg .d { fill:var(--dim); font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  svg .m { fill:var(--acc); font:600 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  svg .mk { fill:var(--kill); } svg .mw { fill:var(--warn); }
+  svg .ar { stroke:var(--dim); stroke-width:1.6; fill:none; marker-end:url(#arr); }
+  svg #arr path { fill:var(--dim); }
+  /* tables */
+  .tbl { overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td { border-bottom:0; }
+  th { color:var(--dim); font-weight:600; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+  td.n, th.n { text-align:right; font-family:var(--mono); white-space:nowrap; }
+  td .f { font-family:var(--mono); font-size:.85rem; color:var(--ink); }
+  td small { color:var(--dim); }
+  .ok { color:var(--kill); } .stale { color:var(--warn); } .no { color:var(--bad); }
+  /* cost case form */
+  .form { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px 16px; margin:14px 0 16px; }
+  .form label { display:block; font-size:.86rem; color:var(--dim); }
+  .form input { display:block; width:100%; margin-top:4px; font:inherit; font-family:var(--mono); color:var(--ink); background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  .form input:focus-visible { outline:2px solid var(--acc); outline-offset:1px; }
+  .big { display:flex; flex-wrap:wrap; gap:14px 28px; margin:14px 0; }
+  .big b { display:block; font-family:var(--mono); font-size:1.4rem; line-height:1.25; }
+  .big span { color:var(--dim); font-size:.82rem; }
+  .src { font-size:.84rem; color:var(--dim); }
+  .src li { margin-bottom:4px; overflow-wrap:anywhere; }
+  .why { color:var(--bad); font-size:.9rem; min-height:1.2em; }
+  .role { margin:0 0 14px; }
+  .role b { color:var(--ink); }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin:10px 0; }
+  details summary { cursor:pointer; font-weight:600; }
+  details p { color:var(--dim); margin:8px 0 2px; }
 </style>
 </head>
 <body>
@@ -63,60 +111,286 @@
   <p class="tag">A drop-in CI gate that proves your tests actually have <strong>teeth</strong> — and mints a receipt anyone can re-run.</p>
   <a class="live" href="https://github.com/sjgant80-hub/witness">github.com/sjgant80-hub/witness →</a>
   <a class="live" href="https://github.com/sjgant80-hub/witness/actions/workflows/landing.yml">re-run the landing →</a>
+  <a class="live" href="https://github.com/sjgant80-hub/witness/actions/workflows/ci.yml">the gate's own CI →</a>
 
+  <nav class="toc" aria-label="On this page">
+    <a href="#what">What it is</a><a href="#start">Start here</a><a href="#how">How it works</a><a href="#blueprint">Blueprint</a>
+    <a href="#adoption">Adoption</a><a href="#business">For business</a><a href="#cost">Cost case</a><a href="#paper">White paper</a>
+  </nav>
+
+  <section id="what">
   <p class="lead">A green test suite tells you the tests <em>ran</em>, not that they'd <em>catch a regression</em>.
   witness flips one operator per line of your source — <code>&gt;</code>→<code>&gt;=</code>, <code>&amp;&amp;</code>→<code>||</code> —
   and reruns <strong>your own tests</strong>. A mutant that survives is a line your suite can't tell from a bug:
   <em>test-theatre</em>. The pass is an un-forgeable, re-runnable <strong>Proof-of-Play</strong> receipt. No LLM, zero dependencies.</p>
 
+  <div class="plain">
+    <p><strong>In plain words.</strong> witness checks your <em>tests</em>, not your code. It makes small deliberate mistakes in your code, one at a time — a "greater than" becomes "greater than or equal", an "and" becomes an "or" — and runs your tests after each one. If your tests still pass with the mistake in, they would not have noticed that bug either, and witness names the exact line.</p>
+    <p>Then it writes a short receipt: which files, which tests, how many mistakes were caught, under exactly which version of the gate, sealed with a hash. Anyone can run the same check and get the same hash. A receipt copied onto code it does not describe is refused.</p>
+  </div>
+  </section>
+
   <h2>Landed on real external code</h2>
   <div class="land" id="land">
     <div class="hdr">
       <span class="repo">vercel/ms</span>
-      <span class="pill">pinned @ 1c6264b</span>
-      <span class="pill">~250M downloads/week</span>
+      <span class="pill" id="land-pin">pinned @ 1c6264b</span>
       <span class="pill" id="badge-pill">loading receipt…</span>
     </div>
-    <p style="margin:12px 0 0;color:var(--dim);font-size:.95rem">We pointed witness at a battle-tested library nobody in our org wrote, and ran it against the library's own 49-test suite. The result is whatever the rail honestly found — reproduced on GitHub's runner, anchored by a hash:</p>
+    <p style="margin:12px 0 0;color:var(--dim);font-size:.95rem">We pointed witness at <a href="https://github.com/vercel/ms">vercel/ms</a>, Vercel's MIT-licensed time-string library (<a href="https://www.npmjs.com/package/ms">its weekly downloads on npm</a>) — code nobody in our organisation wrote — and ran it against the library's own test suite. The result is whatever the gate honestly found, reproduced on GitHub's runner by the <a href="https://github.com/sjgant80-hub/witness/actions/workflows/landing.yml">landing workflow</a>, anchored by a hash:</p>
     <div class="stat" id="stat"></div>
     <div id="survivors"></div>
     <div class="anchor" id="anchor"></div>
+    <div class="anchor" id="anchor-history"></div>
   </div>
 
-  <h2>Add it to your CI in 60 seconds</h2>
+  <section id="start">
+  <h2>Start here</h2>
+  <p>Six steps from nothing to a gate in your pull requests. You need a repository whose tests run from one command and exit non-zero when a test fails.</p>
   <ol class="step">
-    <li>Drop a <code>witness.bench.json</code> in your repo — the whole integration is this one file:
-<pre><code>{ <span class="c-dim">"files"</span>: [<span class="c-kill">"src/index.js"</span>],
+    <li><strong>Pick the files where a wrong comparison costs money or trust</strong> — validators, pricing, permission checks, parsers. Start with two or three; you can add more later.</li>
+    <li><strong>Time your tests once.</strong> witness runs them once per mutant, and it refuses a per-mutant bound under <b class="k-headroom">…</b>× an honest run, because a bound that is too tight makes every mutant time out and count as caught.</li>
+    <li><strong>Commit one file</strong>, <code>witness.bench.json</code>, at the root of the repository:
+<pre><code>{ <span class="c-dim">"files"</span>: [<span class="c-kill">"src/pricing.js"</span>, <span class="c-kill">"src/auth.js"</span>],
   <span class="c-dim">"testCommand"</span>: <span class="c-kill">"npm test"</span> }</code></pre></li>
-    <li>Add one step to your workflow:
-<pre><code><span class="c-dim">- name: witness — proof of play</span>
-  uses: <span class="c-kill">sjgant80-hub/witness@v1</span></code></pre></li>
-    <li>CI now fails on test-theatre and uploads a <strong>Proof-of-Play</strong> receipt + a step summary + a badge — every run.</li>
+    <li><strong>Add one step</strong> to your workflow (pin the exact tag — the receipt fingerprints the gate, so a moving tag would move your anchor):
+<pre><code><span class="c-dim">- uses: actions/checkout@v4</span>
+<span class="c-dim">- run: npm ci</span>
+- name: witness — proof of play
+  uses: <span class="c-kill">sjgant80-hub/witness@v0.7</span></code></pre></li>
+    <li><strong>Open the run.</strong> The step summary lists every surviving line as <code>file:line — the flip — the code</code>, and the run keeps <code>witness-receipt.json</code>, <code>witness-verdict.json</code> and a badge as the <code>witness-proof</code> artifact.</li>
+    <li><strong>Close each survivor.</strong> Usually the fix is a test, not a code change: add the case that pins that boundary (for <code>n &gt; 0</code>, test <code>0</code>). If no test can ever tell the two apart — an equivalent mutant — record it in <code>witness.baseline.json</code> with a reason of at least <b class="k-reason">…</b> characters. It is matched to the exact line, so it stops applying the moment that line changes.</li>
+  </ol>
+  <p>Prefer to try it on your laptop first? The gate is two files; nothing is installed.</p>
+<pre><code><span class="c-dim"># ⚑ not `npx witness` — that npm name belongs to an unrelated package</span>
+git clone --depth 1 --branch v0.7 https://github.com/sjgant80-hub/witness.git .witness
+node .witness/witness.mjs mutate src/pricing.js --test npm test
+node .witness/witness.mjs fuzz src/parse.js parseOrder        <span class="c-dim"># hostile input must never throw</span>
+node .witness/witness-bench.mjs prove . &gt; receipt.json       <span class="c-dim"># mint the receipt</span>
+PROOF_ASSESSOR=.witness/witness-bench.mjs \
+  node .witness/vendor/proof-of-play/filter.mjs verify receipt.json "$PWD"   <span class="c-kill">✓ AUTHENTIC</span></code></pre>
+  </section>
+
+  <section id="how">
+  <h2>How it works</h2>
+  <p>The flow below is the code, in order, with the numbers filled in from the real vercel/ms receipt (<code>landing/ms-verdict.json</code>).</p>
+  <figure class="fig">
+    <svg viewBox="0 0 420 1010" role="img" aria-labelledby="flow-t flow-d">
+      <title id="flow-t">How a witness run works</title>
+      <desc id="flow-d">Source and tests go in; comments are masked; one operator is flipped per site; the unmutated suite must pass first; each mutant is run under a supervisor; caught mutants are killed, passing ones survive unless exempted with a reason; the verdict is hashed with the gate's fingerprint into a receipt that verify re-runs.</desc>
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>
+
+      <rect class="bx acc" x="20" y="10" width="380" height="64" rx="10"/>
+      <text class="t" x="36" y="36">1 · your source + your own tests</text>
+      <text class="d" x="36" y="58">traced run: <tspan class="m" id="f-src">index.js</tspan> of vercel/ms, its own suite</text>
+      <path class="ar" d="M210 74 V94"/>
+
+      <rect class="bx" x="20" y="96" width="380" height="84" rx="10"/>
+      <text class="t" x="36" y="122">2 · commentMask() — comments are not code</text>
+      <text class="d" x="36" y="143">operators inside // and /* */ are skipped;</text>
+      <text class="d" x="36" y="161">strings stay mutable; regexes are consumed;</text>
+      <text class="d" x="36" y="176">a quote run stops at a line break (v0.7)</text>
+      <path class="ar" d="M210 180 V200"/>
+
+      <rect class="bx" x="20" y="202" width="380" height="64" rx="10"/>
+      <text class="t" x="36" y="228">3 · mutants() — one flip per site</text>
+      <text class="d" x="36" y="250"><tspan class="m" id="f-ops">…</tspan> kinds of spaced flip → <tspan class="m" id="f-total">…</tspan> mutants</text>
+      <path class="ar" d="M210 266 V286"/>
+
+      <rect class="bx" x="20" y="288" width="380" height="84" rx="10"/>
+      <text class="t" x="36" y="314">4 · baseline run, under runner.mjs</text>
+      <text class="d" x="36" y="335">your unmutated tests must pass, and the bound</text>
+      <text class="d" x="36" y="353">must be ≥ <tspan class="m k-headroom">…</tspan>× their run — otherwise the gate</text>
+      <text class="d" x="36" y="368">refuses to give any verdict at all</text>
+      <path class="ar" d="M210 372 V392"/>
+
+      <rect class="bx" x="20" y="394" width="380" height="84" rx="10"/>
+      <text class="t" x="36" y="420">5 · for each mutant</text>
+      <text class="d" x="36" y="441">back up the file, write the mutant, run your</text>
+      <text class="d" x="36" y="459">tests (runner.mjs bounds the run and kills the</text>
+      <text class="d" x="36" y="474">whole process tree), restore byte for byte</text>
+      <path class="ar" d="M130 478 V508"/>
+      <path class="ar" d="M290 478 V508"/>
+
+      <rect class="bx kill" x="20" y="510" width="182" height="70" rx="10"/>
+      <text class="t" x="34" y="536">tests FAIL</text>
+      <text class="d" x="34" y="558">killed: <tspan class="m mk" id="f-killed">…</tspan></text>
+      <text class="d" x="34" y="574">the suite caught it</text>
+      <rect class="bx warn" x="218" y="510" width="182" height="70" rx="10"/>
+      <text class="t" x="232" y="536">tests PASS</text>
+      <text class="d" x="232" y="558">survived: <tspan class="m mw" id="f-surv">…</tspan></text>
+      <text class="d" x="232" y="574">test-theatre, named by line</text>
+      <path class="ar" d="M309 580 V602"/>
+
+      <rect class="bx" x="20" y="604" width="380" height="70" rx="10"/>
+      <text class="t" x="36" y="630">6 · witness.baseline.json</text>
+      <text class="d" x="36" y="651">a survivor is exempt only with a reason of</text>
+      <text class="d" x="36" y="668">≥ <tspan class="m k-reason">…</tspan> characters, matched to the exact line</text>
+      <path class="ar" d="M40 580 V592 H9 V722 H17"/>
+      <path class="ar" d="M210 674 V694"/>
+
+      <rect class="bx" x="20" y="696" width="380" height="52" rx="10"/>
+      <text class="t" x="36" y="720">7 · verdict</text>
+      <text class="d" x="36" y="740">total · killed · survived · ignored · clean</text>
+      <path class="ar" d="M210 748 V768"/>
+
+      <rect class="bx acc" x="20" y="770" width="380" height="104" rx="10"/>
+      <text class="t" x="36" y="796">8 · witness-bench.mjs — assembleVerdict()</text>
+      <text class="d" x="36" y="817">badge + counts + spec + the gate's own</text>
+      <text class="d" x="36" y="835">fingerprint → canonical JSON → SHA-256 anchor</text>
+      <text class="m" x="36" y="860" id="f-anchor">anchor …</text>
+      <path class="ar" d="M210 874 V894"/>
+
+      <rect class="bx acc" x="20" y="896" width="380" height="104" rx="10"/>
+      <text class="t" x="36" y="922">9 · receipt → anyone runs verify</text>
+      <text class="d" x="36" y="943">verify re-runs the gate on the repo itself:</text>
+      <text class="d" x="36" y="961"><tspan class="mk">same anchor → ✓ AUTHENTIC</tspan>; otherwise refused,</text>
+      <text class="d" x="36" y="979">and it says which: the gate changed, the</text>
+      <text class="d" x="36" y="994">result changed, the anchor, or the repo</text>
+    </svg>
+    <figcaption>The vercel/ms run, read from its committed receipt. Every number in the diagram is filled in from that file when this page loads.</figcaption>
+  </figure>
+
+  <h3>Step by step, in the code</h3>
+  <ol class="step">
+    <li><code>commentMask()</code> scans the source — it does not regex it — and marks comment bytes. An operator in a comment can never be killed by a test, so it is not offered. Strings are left mutable on purpose: a changed error message or pattern really does change the program.</li>
+    <li><code>mutants()</code> finds each spaced operator (<code> &gt; </code>, not <code>&gt;</code>, so <code>=&gt;</code> and <code>&gt;&gt;&gt;</code> are never hit) and makes one copy of the file per site with exactly that one flip.</li>
+    <li><code>runMutations()</code> runs your suite once, unmutated. A red baseline would make every mutant look caught, so it refuses. It times that run and refuses a bound under <b class="k-headroom">…</b>× it.</li>
+    <li>Before touching your file it writes an atomic backup beside it; if a run is ever killed half way, the next run heals from it. Each mutant is written, your tests run under <code>runner.mjs</code>, and the original is restored in a <code>finally</code>.</li>
+    <li>A mutant the tests fail on (or time out on) is killed. A mutant they pass is a survivor, unless <code>witness.baseline.json</code> holds an argued reason for that exact line.</li>
+    <li><code>witness-bench.mjs</code> turns the per-file counts into a verdict and hashes it, together with a fingerprint of witness itself, into the anchor. The receipt carries the anchor. The vendored proof-of-play <code>verify</code> re-runs the gate and compares.</li>
   </ol>
 
-  <div class="grid">
-    <div class="card">
-      <h3>Mutation gate <span class="k">the teeth test</span></h3>
-      <p>Flip one operator and run your tests. Still green? That line is unguarded — a hole a real regression falls straight through. It even refuses a file with nothing to mutate, or a red baseline: an empty run is not a pass.</p>
+  <h3>Why the receipt can't be faked</h3>
+  <p class="note">Authenticity rests on a reproducible hash, not a signer. <code>verify</code> re-runs the benchmark and
+  tells the refusals apart instead of calling everyone a forger: <strong>benchmark-changed</strong> (the gate moved — an
+  instrument fingerprint is baked into the proof), <strong>verdict-changed</strong> (your code or tests moved — re-prove),
+  <strong>anchor-mismatch</strong> (the forgery shape), and <strong>repo-mismatch</strong> (a receipt carried to another
+  repository). The gate is turned on itself: every organ below is mutation-gated in this repo's own CI.</p>
+  </section>
+
+  <section id="blueprint">
+  <h2>Blueprint</h2>
+  <p>Organ by organ. Each gate result is read from the receipt CI kept for it (<code>receipts/ci/</code>), and this page hashes the files it serves and shows the result as <span class="ok">current</span> only while every file the run covered still hashes the same.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Organ</th><th>What it does</th><th>Gate, as the repo shows it</th></tr></thead>
+    <tbody id="bp">
+      <tr><td class="f">witness.mjs</td><td>The engine: comment masker, mutant generator, the gated run, the baseline, the fuzz battery, the CLI. <small id="bp-lines-w"></small></td><td data-receipt="witness-gate">…</td></tr>
+      <tr><td class="f">runner.mjs</td><td>The supervisor that holds the stopwatch: bounds one run of your tests and kills its whole process tree. <small id="bp-lines-r"></small></td><td data-receipt="runner-gate">…</td></tr>
+      <tr><td class="f">witness-bench.mjs</td><td>Turns a gate run into the proof-of-play verdict and receipt; fingerprints the gate itself.</td><td data-receipt="bench-gate">…</td></tr>
+      <tr><td class="f">vendor/proof-of-play/filter.mjs</td><td><code>prove</code> / <code>verify</code>: re-runs the benchmark and refuses a receipt that does not reproduce, by cause. Vendored verbatim (MIT) from <a href="https://github.com/sjgant80-hub/proof-of-play">proof-of-play</a>.</td><td><small>vendored; its tests run in its own repository</small></td></tr>
+      <tr><td class="f">action.yml · ci.mjs</td><td>The GitHub Action: reads <code>witness.bench.json</code> or the inputs, runs the gate once, writes the receipt, step summary and badge, fails the build on theatre; optional fuzz targets.</td><td><small><code>action-dogfood</code> runs it three ways on every push: it must pass a boundary-pinning suite, and it must <em>fail</em> a theatre suite and a function that throws.</small></td></tr>
+      <tr><td class="f">server/verify-core.mjs</td><td>Verify-as-a-tool: request parsing, the allowlist, credit tokens, the answer shape (REST and MCP).</td><td data-receipt="server-gate-verify-core">…</td></tr>
+      <tr><td class="f">server/payments.mjs</td><td>The checkout seam the server can use; inactive until its owner configures it.</td><td data-receipt="server-gate-payments">…</td></tr>
+      <tr><td class="f">server/http.mjs · jobs.mjs</td><td>The HTTP and job shims around the two kernels above (clone at a pinned commit, run the bench, refuse unknown repos outside a container).</td><td><small>IO only; the decisions live in the gated kernels</small></td></tr>
+      <tr><td class="f">case/witnesscase.mjs</td><td>The cost case on this page, imported as is, from the vendored sourced basis.</td><td data-receipt="case-gate">…</td></tr>
+      <tr><td class="f">skill/</td><td>witness as an agent skill: one self-contained file built from the v0.6 tag, plus a receipt command.</td><td id="bp-skill">…</td></tr>
+      <tr><td class="f">landing/</td><td>The external proof on vercel/ms and <code>check.mjs</code>, which fails the monthly run unless it reproduces the committed anchor.</td><td id="bp-landing">…</td></tr>
+      <tr><td class="f">witness.baseline.json</td><td>The reviewed exemptions for witness's own gate, each with its argued reason.</td><td id="bp-baseline">…</td></tr>
+    </tbody>
+  </table></div>
+  </section>
+
+  <section id="adoption">
+  <h2>Adoption</h2>
+  <p><strong>What it does for a team.</strong> Code review asks "is this change right?". Nobody has time to ask the second question on every pull request: "would our tests have caught it if it were wrong?". witness asks that second question mechanically, on the lines you choose, every time — and it matters most where the tests were written by the same hand as the code, including an AI assistant's hand. A pull request whose new tests do not actually guard its new behaviour gets a red check that names the line.</p>
+  <ol class="step">
+    <li><strong>One repository, report only.</strong> Add the step to your riskiest repository with <code>continue-on-error: true</code> on it. Read the survivors for a sprint; they are a map of where your suite is thinner than it looks.</li>
+    <li><strong>Close or argue every survivor.</strong> Add the missing boundary tests; record genuine equivalents in <code>witness.baseline.json</code> with their reasons. Review those reasons like code — they are the only way a survivor goes quiet.</li>
+    <li><strong>Make it required.</strong> Remove <code>continue-on-error</code> and add the check to branch protection. From here a change that weakens a guarded line cannot merge quietly.</li>
+    <li><strong>Grow the list.</strong> Add files to <code>witness.bench.json</code> as they earn it. For a suite too slow to run per pull request, run the gate nightly with <code>cap</code> set, and keep the per-PR gate on the core files.</li>
+    <li><strong>Keep the receipts.</strong> Each run's <code>witness-proof</code> artifact is a reproducible record of test effectiveness for that commit. An auditor, a customer or another team re-runs <code>verify</code> and gets the same anchor — or a refusal that says why.</li>
+  </ol>
+  </section>
+
+  <section id="business">
+  <h2>For business</h2>
+  <p><strong>What it is.</strong> A build gate that measures whether your automated tests would catch a regression, names every line where they would not, and keeps a re-runnable receipt of the answer for each commit. It runs inside the CI you already have, on your code, with your tests. It needs no model, no account and no network.</p>
+
+  <h3>What each role gets</h3>
+  <p class="role"><b>CEO.</b> A number you can trust about the thing your customers actually feel: whether the next change can break what already works without anyone noticing. AI-written code is arriving faster than people can review it; this is the check that the tests keeping it honest are real.</p>
+  <p class="role"><b>CFO.</b> Fewer escaped defects for no new licence: the gate is MIT and runs on hardware and CI you already pay for. The cost case below is computed from sourced public figures and your own numbers, and lists every source. Nothing here is our price.</p>
+  <p class="role"><b>COO.</b> A gate that is deterministic: given tests that are themselves deterministic, the same commit gives the same verdict every time, so it adds no flaky red builds and no arguments about whose machine is right. Rolled out in the five steps above, one repository at a time.</p>
+  <p class="role"><b>CTO / CISO.</b> Zero-dependency JavaScript files you can read before you pin them, pinned to a tag: two for the gate, three more for the Action. No network calls, no telemetry, nothing leaves the runner except the artifact your own workflow uploads. It restores your source byte for byte, heals itself after a hard kill, and refuses to report a pass it did not earn: an empty run, a red baseline and a too-tight bound are all refusals, not greens.</p>
+  <p class="role"><b>Engineering teams.</b> A survivor is a line number and a one-operator diff, not an opinion. The fix is usually one test. Exemptions need a written reason and expire when the line changes, so the gate cannot be talked out of its verdict.</p>
+  <p class="role"><b>QA and test leads.</b> Coverage says a line was executed; this says whether the assertions would notice it changing. It turns "write better tests" into a list.</p>
+  <p class="role"><b>Procurement.</b> Supplier, licence, support and exit are set out below in full; there is no subscription to buy for the gate itself.</p>
+
+  <h3>What you pay now, and what changes</h3>
+  <p>Today the question "would our tests catch this?" is answered by people, in review time, or not at all. The other route on the market is to send every change to a cloud AI model for review. The cost case below compares those two with running witness — and keeps the comparison like for like: the cloud model is credited with exactly the same share of the work as the gate, so the two differ only in their running bill. What the figures cannot show: a model's review is not reproducible from one run to the next, and it means sending your source to a third party. witness gives the same answer every run, on your runner.</p>
+
+  <div class="card" id="cost">
+    <h3>Cost case <span class="k">computed by case/witnesscase.mjs</span></h3>
+    <p>Your numbers in; the kernel on this page computes the rest from the vendored, sourced basis. Change any field. The starting values are examples, not measurements: the honest way to get your own hours and share is to run the gate report-only for a sprint (adoption step 1) and count the review time it replaces.</p>
+    <div class="form" id="case-form">
+      <label>Hours a week your team spends checking tests really guard changes <input type="number" id="in-review" min="0" max="168" step="0.5"></label>
+      <label>Share of that checking the gate takes over (%) <input type="number" id="in-share" min="0" max="100" step="5"></label>
+      <label>Changes (pull requests) reviewed a week <input type="number" id="in-changes" min="0" step="1"></label>
+      <label>Tokens a model would read per review <input type="number" id="in-tin" min="0" step="1000"></label>
+      <label>Tokens a model would write per review <input type="number" id="in-tout" min="0" step="100"></label>
+      <label>Hours a week the gate runs on a machine you already use <input type="number" id="in-gate" min="0" max="168" step="0.5"></label>
+      <label>Years <input type="number" id="in-years" min="1" max="10" step="1"></label>
     </div>
-    <div class="card">
-      <h3>Proof-of-Play <span class="k">un-forgeable</span></h3>
-      <p>The verdict is content-addressed over your code, your tests, and the gate itself. The receipt carries that hash. Re-run on any clean machine and it reproduces — paste a passing hash onto a theatre repo and verification re-derives the real one. Refused.</p>
-    </div>
+    <div class="why" id="case-why" role="status"></div>
+    <div class="big" id="case-big"></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Route</th><th class="n">a year</th><th class="n" id="case-years-h">over the years</th></tr></thead>
+      <tbody id="case-rows"></tbody>
+    </table></div>
+    <p class="src" style="margin-top:12px">How it is counted: staff time at the UK median hourly wage, on-costs left out, so it is a floor. Later years rise by UK CPI. The model's bill is its published per-token price converted at the ECB reference rate. The gate's bill is the extra electricity of a laptop already in use. CI runner minutes are not priced, because there is no sourced figure for them here: on a public repository GitHub's hosted runners cost nothing; on a private one the minutes come from the plan you already have.</p>
+    <p class="src" style="margin:10px 0 4px"><strong>Every figure and its source</strong> (from <code>vendor/sovereign-enterprise/basis.json</code>):</p>
+    <ul class="src" id="case-src"></ul>
   </div>
 
-  <h2>Why the receipt can't be faked</h2>
-  <p class="note">Authenticity rests on a reproducible hash, not a signer. <code>verify</code> re-runs the benchmark and
-  tells three refusals apart instead of calling everyone a forger: <strong>benchmark-changed</strong> (the gate moved — an
-  instrument fingerprint is baked into the proof), <strong>repository</strong> (your code moved — re-prove), and the
-  <strong>anchor</strong> that doesn't reproduce (the forgery shape). The gate turned on itself: mutation-gated in its own CI,
-  including the proof-of-play adapter.</p>
-<pre><code><span class="c-dim"># mint a receipt (one gate run)</span>
-npx witness-bench prove . <span class="c-dim">&gt; receipt.json</span>
+  <h3>Security and data protection</h3>
+  <ul>
+    <li><strong>Runs where your code already is.</strong> In your CI runner or on your machine. witness makes no network call; the only thing that runs is your own test command, which does whatever your tests already do.</li>
+    <li><strong>Nothing to install, nothing to trust blind.</strong> The gate is two zero-dependency files (<span id="sec-lines">witness.mjs and runner.mjs</span>) taken by an exact tag; the Action adds three more from the same tag, also zero-dependency (<code>witness-bench.mjs</code>, <code>ci.mjs</code> and the vendored proof-of-play <code>filter.mjs</code>). Read them before you pin them; for the strictest pin, use the commit SHA the tag points to instead of the tag. The served <code>witness.mjs</code> on this page hashes to <code id="sec-sha">…</code> (SHA-256, LF line endings), so you can compare it with your clone.</li>
+    <li><strong>No secrets, no write access.</strong> The Action needs no token or secret and no write permission to your repository. It changes files only in the runner's working copy — one source file at a time, restored — and writes its receipt files beside them. Besides itself it uses GitHub's own <code>actions/setup-node</code> and <code>actions/upload-artifact</code>.</li>
+    <li><strong>Your source is never left changed.</strong> Restored in a <code>finally</code> on every run, with an atomic backup beside it that the next run heals from if the machine dies mid-run; an empty backup is refused rather than applied.</li>
+    <li><strong>No personal data, and nothing reaches us.</strong> The gate reads source files and test results. The receipt holds file names, the test command, counts and hashes; the verdict also quotes each surviving line of code. Both stay in your artifact store. AI Native Solutions receives nothing from a run, so the gate involves no data processing on our side.</li>
+    <li><strong>It cannot be argued into a green.</strong> An exemption needs a written reason of at least <b class="k-reason">…</b> characters, is matched to the exact line, and is reported when refused.</li>
+    <li><strong>Evidence, not assertion.</strong> The receipt is a reproducible, hash-anchored record of test effectiveness per commit that you can attach to change-management evidence; anyone re-derives it.</li>
+  </ul>
 
-<span class="c-dim"># anyone re-verifies — re-runs the gate, checks the anchor</span>
-node verify receipt.json .   <span class="c-kill">✓ AUTHENTIC</span>
-<span class="c-dim"># tampered anchor / wrong repo</span>              <span class="c-bad">✗ REFUSED</span></code></pre>
+  <h3>Roll-out</h3>
+  <p>The five adoption steps above: report-only on one repository, close the survivors, make it required, grow the file list, keep the receipts. The integration is one JSON file and one workflow step; removing it is deleting those two.</p>
+
+  <h3>Ownership, support and exit</h3>
+  <ul>
+    <li><strong>Supplier:</strong> AI Native Solutions — <a href="https://www.ai-nativesolutions.com">www.ai-nativesolutions.com</a>; contact through that site.</li>
+    <li><strong>Support:</strong> support, SLA, warranty and liability are agreed per deployment.</li>
+    <li><strong>Licence:</strong> MIT. You keep the files; they keep running without us. There is no service to switch off and no key to expire.</li>
+    <li><strong>Exit:</strong> delete <code>witness.bench.json</code> and the workflow step. Receipts you kept stay verifiable with the same tag.</li>
+  </ul>
+
+  <h3>Risks, answered straight</h3>
+  <details><summary>It runs our tests many times. Is it slow?</summary><p>Yes, by design: one run of your suite for the baseline and one per mutant, so a gate takes roughly (mutants + 1) × your suite time. Gate the behaviour-critical files, set <code>cap</code>, and run a large suite nightly rather than per pull request. witness refuses a bound that is too tight instead of quietly scoring every timeout as a catch.</p></details>
+  <details><summary>What if our tests are flaky?</summary><p>Then the gate is as flaky as they are. A test that fails at random can make a mutant look caught when it was the flake that failed. witness only refuses a baseline that is red on its single honest run; it cannot see a flake that happened to pass. Gate the files whose tests are deterministic first, and treat a survivor that comes and goes between runs as a flaky test to fix.</p></details>
+  <details><summary>Some survivors can never be killed.</summary><p>True — equivalent mutants are a known floor of mutation testing. They go in <code>witness.baseline.json</code> with an argued reason; each is tied to the exact line and lapses when that line changes. This repo's own gate carries <b id="risk-baseline">its</b> exemptions in public, each with its reason.</p></details>
+  <details><summary>Does a clean gate mean our code is correct?</summary><p>No. It means your tests notice each of the <b class="k-ops">…</b> kinds of one-operator change at every site in the files you named. That is a strong, specific statement about the tests — not a proof that the code meets its requirements.</p></details>
+  <details><summary>Which languages?</summary><p>It is built for JavaScript and TypeScript-style sources: the comment masker understands that syntax (comments, strings, templates, regexes). The test command can be anything that exits non-zero on failure.</p></details>
+  <details><summary>It runs code. Is that safe?</summary><p>It runs your own test command on your own runner — what CI already does. The optional verify server refuses unknown repositories unless it is deployed in a disposable container, and says so rather than pretending.</p></details>
+  <details><summary>Who else uses it?</summary><p>No outside team has it in their CI yet. The proof so far is the landing above: the gate run on a widely used external library, reproduced on GitHub's runner, receipt committed. You would be among the first; the MIT licence means that carries no lock-in risk.</p></details>
+  <details><summary>What if the supplier disappears?</summary><p>Nothing changes. Two files, MIT, pinned by tag, no service behind them.</p></details>
+
+  <h3>The case for the board</h3>
+  <p class="note">Automated tests are the control the business relies on to keep each change from breaking what already works, and with AI writing more of the code, they are now the main control. Today nobody measures whether that control works. witness measures it on every change, names each gap by line, and keeps a receipt anyone can re-run. It costs no licence, runs on infrastructure already paid for, sends nothing outside, and can be removed in one commit. The ask is one repository, report-only, for one sprint.</p>
+  </section>
+
+  <section id="paper">
+  <h2>White paper</h2>
+  <h3>The problem: green is not guarded</h3>
+  <p>A passing suite proves the tests ran. It does not prove they would fail if the code were wrong. The common shape is a suite for <code>isPositive</code> that checks <code>1</code> and <code>-1</code> but never <code>0</code>; the day someone writes <code>n &gt;= 0</code>, every test still passes. Coverage does not see this — the line was executed. Review rarely sees it — the test looks fine. We call it test-theatre, and audits of our own code kept finding it, along with functions documented as tolerant that crash on hostile input.</p>
+  <h3>The method: mutation testing, made deterministic</h3>
+  <p>Mutation testing is an old, well-studied idea (DeMillo, Lipton and Sayward, <em>Hints on Test Data Selection</em>, IEEE Computer, 1978): change the program slightly and see whether the tests notice. witness keeps it small and strict — <b class="k-ops">…</b> spaced operator flips, one per mutant, so a survivor names one line — and makes it deterministic: the same source, deterministic tests and the same gate give the same verdict on any machine.</p>
+  <h3>What the gate refuses to do</h3>
+  <p>Most of witness is refusals, each one a real failure it once produced. It will not score a file with nothing to mutate as clean. It will not gate a red baseline, which would make every mutant look caught. It will not accept a per-mutant bound under <b class="k-headroom">…</b>× the honest run, which would let timeouts score a perfect result. It will not offer a mutant inside a comment, which no test could ever kill. It will not let an exemption through without a reason, and it says out loud when it refuses one. It will not leave orphaned processes or a mutated file behind. And since v0.7 it will not exit silently when run through a symlink, and a stray quote cannot hide the next line of code from it.</p>
+  <h3>The receipt: a claim anyone can re-run</h3>
+  <p>The verdict — badge, counts, the spec and a fingerprint of the gate itself — is serialised canonically and hashed. The receipt carries that anchor. Verification does not trust a signature; it re-runs the gate and compares. A changed gate, a changed result, a fabricated anchor and a receipt moved to another repository are each refused, and named as what they are.</p>
+  <h3>Evidence and limits</h3>
+  <p>The landing above is the external evidence: a widely used library, its own tests, two honest survivors at unguarded boundaries, reproduced on GitHub's runner. The internal evidence is the blueprint: every organ of witness is gated by witness in CI, with the receipts on this page checked against the files. The limits are stated in the risks above: a clean gate is a statement about the tests, for these operators, in these files — not a proof of correctness.</p>
+  </section>
 
   <h2>The lesson it caught in itself</h2>
   <p class="note">witness spawns your test runner. The first time it ran under its <em>own</em> <code>node --test</code>
@@ -130,36 +404,152 @@ node verify receipt.json .   <span class="c-kill">✓ AUTHENTIC</span>
     <a href="https://github.com/sjgant80-hub/witness">source</a> ·
     <a href="https://github.com/sjgant80-hub/witness/actions/workflows/landing.yml">re-run the landing</a>.
     Landing subject: <a href="https://github.com/vercel/ms">vercel/ms</a> (MIT), used unmodified as an external test subject.
-      <br>Use it from your agent: the <a href="https://github.com/sjgant80-hub/witness/tree/master/skill">witness-mutation-gate skill</a> (one file, with a re-runnable receipt).
-    Powered by the Konomi architecture, created by Thomas Frumkin.
+    <br>Use it from your agent: the <a href="https://github.com/sjgant80-hub/witness/tree/master/skill">witness-mutation-gate skill</a> (one file, with a re-runnable receipt).
+    <br>Supplied by AI Native Solutions — <a href="https://www.ai-nativesolutions.com">www.ai-nativesolutions.com</a>. Support, SLA, warranty and liability agreed per deployment.
+    <br>Powered by the Konomi architecture, created by Thomas Frumkin.
   </footer>
 </div>
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-try {
-  const v = await (await fetch('./landing/ms-verdict.json?cb=' + Date.now())).json();
-  const s = v.summary;
-  const clean = v.badge === true;
-  const bp = $('#badge-pill');
-  bp.textContent = clean ? 'badge: tests have teeth ✓' : `${s.survived} surviving mutant(s)`;
-  bp.style.color = clean ? 'var(--kill)' : 'var(--warn)';
-  bp.style.borderColor = clean ? 'var(--kill)' : 'var(--warn)';
-  $('#stat').innerHTML = `
-    <div><b class="${clean ? 'c-kill' : 'c-warn'}">${s.killed}/${s.mutants}</b><span>mutants killed</span></div>
-    <div><b>${s.score}</b><span>mutation score</span></div>
-    <div><b class="${s.survived ? 'c-warn' : 'c-kill'}">${s.survived}</b><span>surviving (test-theatre)</span></div>`;
-  const survs = (s.perFileReport || []).flatMap((f) => (f.survivors || []).map((x) => ({ file: f.file, ...x })));
-  if (survs.length) {
-    $('#survivors').innerHTML = '<div class="surv">' + survs.map((x) =>
-      `<div><span class="l">${esc(x.file)}:${x.line}</span> &nbsp;${esc(x.mutation)} &nbsp;<span class="c-dim">${esc(x.snippet)}</span></div>`).join('') +
-      '<div class="c-dim" style="margin-top:8px">These are unguarded boundaries — the suite never pins them, so a one-operator change slips through. Real, low-drama, exactly what the gate is for.</div></div>';
+const $$ = (s) => [...document.querySelectorAll(s)];
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\x22': '&quot;', '\x27': '&#39;' }[c]));
+const getJSON = async (p) => { const r = await fetch(p + (p.includes('?') ? '&' : '?') + 'cb=' + Date.now()); if (!r.ok) throw new Error(p + ' ' + r.status); return r.json(); };
+const getText = async (p) => { const r = await fetch(p + '?cb=' + Date.now()); if (!r.ok) throw new Error(p + ' ' + r.status); return r.text(); };
+const lf = (s) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+const sha256 = async (s) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+const setAll = (sel, v) => $$(sel).forEach((n) => { n.textContent = String(v); });
+const run = (name, fn) => fn().catch((e) => console.warn(name, e));
+
+// ── the gate's own constants, read from the served witness.mjs (never typed into this page) ──
+run('constants', async () => {
+  const src = await getText('./witness.mjs');
+  const reason = src.match(/export const MIN_REASON_CHARS = (\d+);/);
+  const head = src.match(/export const BOUND_HEADROOM = (\d+);/);
+  if (reason) setAll('.k-reason', reason[1]);
+  if (head) setAll('.k-headroom', head[1]);
+  const runner = await getText('./runner.mjs');
+  const n = (t) => lf(t).replace(/\n$/, '').split('\n').length;
+  $('#bp-lines-w').textContent = `(${n(src)} lines)`;
+  $('#bp-lines-r').textContent = `(${n(runner)} lines)`;
+  $('#sec-lines').textContent = `witness.mjs, ${n(src)} lines; runner.mjs, ${n(runner)} lines`;
+  $('#sec-sha').textContent = await sha256(lf(src));
+});
+
+// ── the landing receipt: the vercel/ms run, and the diagram traced from it ──
+run('landing', async () => {
+  try {
+    const v = await getJSON('./landing/ms-verdict.json');
+    const s = v.summary;
+    const clean = v.badge === true;
+    const bp = $('#badge-pill');
+    bp.textContent = clean ? 'badge: tests have teeth ✓' : `${s.survived} surviving mutant(s)`;
+    bp.style.color = clean ? 'var(--kill)' : 'var(--warn)';
+    bp.style.borderColor = clean ? 'var(--kill)' : 'var(--warn)';
+    $('#stat').innerHTML = `
+      <div><b class="${clean ? 'c-kill' : 'c-warn'}">${s.killed}/${s.mutants}</b><span>mutants killed</span></div>
+      <div><b>${s.score}</b><span>mutation score</span></div>
+      <div><b class="${s.survived ? 'c-warn' : 'c-kill'}">${s.survived}</b><span>surviving (test-theatre)</span></div>`;
+    const survs = (s.perFileReport || []).flatMap((f) => (f.survivors || []).map((x) => ({ file: f.file, ...x })));
+    if (survs.length) {
+      $('#survivors').innerHTML = '<div class="surv">' + survs.map((x) =>
+        `<div><span class="l">${esc(x.file)}:${esc(x.line)}</span> &nbsp;${esc(x.mutation)} &nbsp;<span class="c-dim">${esc(x.snippet)}</span></div>`).join('') +
+        '<div class="c-dim" style="margin-top:8px">These are unguarded boundaries — the suite never pins them, so a one-operator change slips through. Not bugs in ms: exactly what the gate is for.</div></div>';
+    }
+    $('#anchor').textContent = 'anchor ' + v.hash + ' · gate fingerprint ' + v.specFingerprint;
+    setAll('#f-src', (v.spec.files || []).join(', '));
+    setAll('.k-ops', v.spec.operators);
+    $('#f-ops').textContent = v.spec.operators;
+    $('#f-total').textContent = s.mutants;
+    $('#f-killed').textContent = s.killed;
+    $('#f-surv').textContent = s.survived;
+    $('#f-anchor').textContent = 'anchor ' + v.hash.slice(0, 16) + '…';
+    $('#bp-landing').innerHTML = `<span class="ok">${s.killed}/${s.mutants} killed, ${s.survived} survived</span> <small>on vercel/ms; the monthly run must reproduce anchor <code>${esc(v.hash.slice(0, 12))}…</code></small>`;
+  } catch (e) {
+    $('#badge-pill').textContent = 'receipt unavailable';
   }
-  $('#anchor').textContent = 'anchor ' + v.hash;
-} catch (e) {
-  $('#badge-pill').textContent = 'receipt unavailable';
+  try {
+    const h = await getJSON('./landing/history/index.json');
+    if (Array.isArray(h) && h.length) $('#anchor-history').textContent = 'earlier anchors, kept: ' + h.map((x) => `${x.hash.slice(0, 12)}… (${x.why})`).join(' · ');
+  } catch { /* no history yet */ }
+});
+
+// ── the blueprint: each CI receipt, checked against the files this page serves ──
+const RECEIPTS = ['witness-gate', 'runner-gate', 'bench-gate', 'server-gate-verify-core', 'server-gate-payments', 'case-gate'];
+async function freshness(inputs) {
+  const out = [];
+  for (const i of inputs || []) {
+    try { out.push({ path: i.path, same: (await sha256(lf(await getText('./' + i.path)))) === i.sha256 }); }
+    catch { out.push({ path: i.path, same: null }); }
+  }
+  return out;
 }
+for (const name of RECEIPTS) {
+  run(name, async () => {
+    const cell = document.querySelector(`[data-receipt="${name}"]`);
+    if (!cell) return;
+    let r;
+    try { r = await getJSON(`./receipts/ci/${name}.json`); }
+    catch { cell.innerHTML = '<small>receipt not committed yet</small>'; return; }
+    const v = r.verdict || {};
+    const fr = await freshness(r.inputs);
+    const changed = fr.filter((x) => x.same === false).map((x) => x.path);
+    const unread = fr.filter((x) => x.same === null).map((x) => x.path);
+    const ign = (v.ignored || []).length;
+    const surv = (v.survived || []).length;
+    const verdict = v.clean ? `<span class="ok">clean ${v.killed}/${v.total} killed${ign ? `, ${ign} reviewed-equivalent` : ''}</span>`
+      : `<span class="no">${surv} survived of ${v.total}${v.baselineFailed ? ' (baseline failed)' : ''}</span>`;
+    const state = changed.length ? `<span class="stale">stale — ${esc(changed.join(', '))} changed since this run</span>`
+      : unread.length ? `<small>could not re-hash ${esc(unread.join(', '))}</small>` : '<span class="ok">current</span>';
+    const link = r.run && r.run.url ? `<a href="${esc(r.run.url)}">CI run</a>` : 'CI run';
+    cell.innerHTML = `${verdict}<br><small>${state} · ${link} on ${esc(String(r.commit || '').slice(0, 7))}, ${esc(r.runner && r.runner.os || '')} ${esc(r.runner && r.runner.node || '')}</small>`;
+  });
+}
+run('skill', async () => {
+  const r = await getJSON('./skill/receipts/witness.json');
+  const same = (await sha256(lf(await getText('./skill/kernel.mjs')))) === r.kernelSha256;
+  $('#bp-skill').innerHTML = `<span class="${r.clean ? 'ok' : 'no'}">receipt layer ${r.killed}/${r.total} killed</span><br><small>${same ? '<span class="ok">current</span>' : '<span class="stale">stale</span>'} · gated by witness ${esc(r.witness.tag)}; the bundle is tested by v0.6's own suite in <code>skill.yml</code></small>`;
+});
+run('baseline', async () => {
+  const b = await getJSON('./witness.baseline.json');
+  const n = Array.isArray(b) ? b.length : 0;
+  $('#bp-baseline').innerHTML = `<span>${n} exemptions, each with its reason</span><br><small>shortest reason ${Math.min(...b.map((e) => String(e.reason || '').length))} characters</small>`;
+  $('#risk-baseline').textContent = `${n}`;
+});
+
+// ── the cost case: the gated kernel, imported as is ──
+run('case', async () => {
+  const { witnessCase, sourcesOf, DEFAULTS } = await import('./case/witnesscase.mjs');
+  const basis = await getJSON('./vendor/sovereign-enterprise/basis.json');
+  const ids = { reviewHoursPerWeek: 'in-review', changesPerWeek: 'in-changes', tokensIn: 'in-tin', tokensOut: 'in-tout', gateHoursPerWeek: 'in-gate', years: 'in-years' };
+  for (const [k, id] of Object.entries(ids)) $('#' + id).value = DEFAULTS[k];
+  $('#in-share').value = Math.round(DEFAULTS.share * 100);
+  const gbp = (x) => x.toLocaleString('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 });
+  const num = (id) => { const t = $('#' + id).value.trim(); return t === '' ? NaN : Number(t); };
+  const draw = () => {
+    const input = Object.fromEntries(Object.entries(ids).map(([k, id]) => [k, num(id)]));
+    input.share = num('in-share') / 100;
+    const r = witnessCase(basis, input);
+    if (!r.ok) { $('#case-why').textContent = 'Check the inputs: ' + r.why; return; }
+    $('#case-why').textContent = '';
+    const y = r.inputs.years;
+    $('#case-years-h').textContent = `over ${y} year${y === 1 ? '' : 's'}`;
+    $('#case-big').innerHTML = `
+      <div><b class="c-kill">${gbp(r.savingPerYear)}</b><span>a year back in staff time, versus today</span></div>
+      <div><b>${gbp(r.savingOver)}</b><span>over ${y} year${y === 1 ? '' : 's'}, with inflation</span></div>
+      <div><b>${gbp(r.versusCloudOver)}</b><span>less than a cloud model on every change, over ${y} year${y === 1 ? '' : 's'}</span></div>`;
+    const row = (label, note, a, b) => `<tr><td>${label}<br><small>${note}</small></td><td class="n">${gbp(a)}</td><td class="n">${gbp(b)}</td></tr>`;
+    $('#case-rows').innerHTML =
+      row('Today', `checking by hand: ${gbp(r.lines.staff)} of staff time a year`, r.perYear.today, r.over.today) +
+      row('A cloud AI model on every change', `same share taken off; its bill ${gbp(r.lines.api)} a year`, r.perYear.cloudModel, r.over.cloudModel) +
+      row('witness on a machine you already run', `same share taken off; electricity ${gbp(r.lines.power)} a year`, r.perYear.witness, r.over.witness);
+  };
+  $('#case-form').addEventListener('input', draw);
+  draw();
+  $('#case-src').innerHTML = sourcesOf(basis).map((s) => `<li><code>${esc(s.key)}</code> — ${esc(s.what)} · <a href="${esc(s.source)}">source</a></li>`).join('');
+  const vals = { wageMedianHourly: basis.wageMedianHourly.value, cpi: basis.cpi.value, fx: basis.fxGbpPerUsd.value };
+  $('#case-src').insertAdjacentHTML('beforeend', `<li>values used: wage £${esc(vals.wageMedianHourly)}/hour · CPI ${esc(vals.cpi * 100)}% · ${esc(basis.electricityPencePerKwh.value)}p/kWh · ${esc(basis.laptopExtraWatts.value)} W · $${esc(basis.frontier.inPerM)} in / $${esc(basis.frontier.outPerM)} out per million tokens · £${esc(vals.fx)} per $</li>`);
+});
 </script>
 </body>
 </html>

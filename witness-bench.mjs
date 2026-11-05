@@ -26,8 +26,8 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { runMutations, OPERATORS, MIN_REASON_CHARS } from './witness.mjs';
+import { fileURLToPath } from 'node:url';
+import { runMutations, OPERATORS, MIN_REASON_CHARS, isEntry } from './witness.mjs';
 
 export const BENCH_VERSION = '1';
 
@@ -249,8 +249,8 @@ async function main() {
   process.exit(v.badge ? 0 : 1);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
-}
+// Run directly, not imported: witness.mjs's isEntry compares REAL paths on both sides, so a run through a
+// symlink (macOS temp, a Windows junction, a symlinked checkout) still starts instead of exiting 0 silently.
+if (isEntry(process.argv[1], import.meta.url)) main();
 
 export default { assess, assembleVerdict, gateFile, canon, specFingerprint, loadBenchConfig, mintReceipt, headline, summaryMarkdown, badgeEndpoint, errMsg, parseCli, renderOutput, BENCH_VERSION, PROOF_VERSION };
