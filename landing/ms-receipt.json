@@ -12,7 +12,7 @@
       "cap": 200,
       "operators": 13
     },
-    "fingerprint": "3a7e2302462ac3903856ad350dc174a6c86ebf3c216db646789c46101db84b9b"
+    "fingerprint": "062276a624f434423c097412d50ca6dbbcd3aefb0285c74feee8544a36003633"
   },
   "verdict": {
     "badge": false,
@@ -25,6 +25,6 @@
       "why": "surviving mutants (test-theatre)"
     }
   },
-  "hash": "69092a4a5120dd1d5fc65c4eeb05de399a25c5b5eb40cdc4049b7a9ed22bc62d",
+  "hash": "52dd47c0fa30ae9ae24ad0dbb0337624d10ccad9d3270d8862818be90890e9f8",
   "admissible": false
 }

@@ -1,0 +1,30 @@
+{
+  "v": "0.1",
+  "repo": "ms",
+  "benchmark": {
+    "spec": {
+      "benchmark": "witness",
+      "benchVersion": "1",
+      "files": [
+        "index.js"
+      ],
+      "testCommand": "npx mocha tests.js",
+      "cap": 200,
+      "operators": 13
+    },
+    "fingerprint": "3a7e2302462ac3903856ad350dc174a6c86ebf3c216db646789c46101db84b9b"
+  },
+  "verdict": {
+    "badge": false,
+    "core": 15,
+    "nonCore": 2,
+    "dominantTell": {
+      "file": "index.js",
+      "survived": 2,
+      "score": 0.882,
+      "why": "surviving mutants (test-theatre)"
+    }
+  },
+  "hash": "69092a4a5120dd1d5fc65c4eeb05de399a25c5b5eb40cdc4049b7a9ed22bc62d",
+  "admissible": false
+}

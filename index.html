@@ -337,7 +337,7 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
       <thead><tr><th>Route</th><th class="n">a year</th><th class="n" id="case-years-h">over the years</th></tr></thead>
       <tbody id="case-rows"></tbody>
     </table></div>
-    <p class="src" style="margin-top:12px">How it is counted: staff time at the UK median hourly wage, on-costs left out, so it is a floor. Later years rise by UK CPI. The model's bill is its published per-token price converted at the ECB reference rate. The gate's bill is the extra electricity of a laptop already in use. CI runner minutes are not priced, because there is no sourced figure for them here: on a public repository GitHub's hosted runners cost nothing; on a private one the minutes come from the plan you already have.</p>
+    <p class="src" style="margin-top:12px">How it is counted: staff time at the UK median hourly wage, on-costs left out, so it is a floor. Later years rise by UK CPI. The model's bill is its published per-token price converted at the ECB reference rate. The gate's bill is the extra electricity of a laptop already in use while it runs your tests: the basis sourced that laptop figure, a processor's base power, for in-browser AI, and it is used here for the same machine's extra draw. CI runner minutes are not priced, because there is no sourced figure for them here: on a public repository GitHub's standard hosted runners cost nothing; on a private one each gate uses roughly (mutants + 1) × your suite time in runner minutes, and those count against the plan you already have — check that headroom before you make the gate required on a private repository.</p>
     <p class="src" style="margin:10px 0 4px"><strong>Every figure and its source</strong> (from <code>vendor/sovereign-enterprise/basis.json</code>):</p>
     <ul class="src" id="case-src"></ul>
   </div>
@@ -350,7 +350,7 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
     <li><strong>Your source is never left changed.</strong> Restored in a <code>finally</code> on every run, with an atomic backup beside it that the next run heals from if the machine dies mid-run; an empty backup is refused rather than applied.</li>
     <li><strong>No personal data, and nothing reaches us.</strong> The gate reads source files and test results. The receipt holds file names, the test command, counts and hashes; the verdict also quotes each surviving line of code. Both stay in your artifact store. AI Native Solutions receives nothing from a run, so the gate involves no data processing on our side.</li>
     <li><strong>It cannot be argued into a green.</strong> An exemption needs a written reason of at least <b class="k-reason">…</b> characters, is matched to the exact line, and is reported when refused.</li>
-    <li><strong>Evidence, not assertion.</strong> The receipt is a reproducible, hash-anchored record of test effectiveness per commit that you can attach to change-management evidence; anyone re-derives it.</li>
+    <li><strong>Evidence, not assertion.</strong> The receipt is a reproducible, hash-anchored record of test effectiveness per commit that you can attach to change-management evidence; anyone re-derives it. The outputs are plain JSON files and an exit code, so any dashboard, policy check or audit tool you already run can read them.</li>
   </ul>
 
   <h3>Roll-out</h3>
@@ -360,12 +360,12 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
   <ul>
     <li><strong>Supplier:</strong> AI Native Solutions — <a href="https://www.ai-nativesolutions.com">www.ai-nativesolutions.com</a>; contact through that site.</li>
     <li><strong>Support:</strong> support, SLA, warranty and liability are agreed per deployment.</li>
-    <li><strong>Licence:</strong> MIT. You keep the files; they keep running without us. There is no service to switch off and no key to expire.</li>
+    <li><strong>Licence:</strong> MIT. You keep the files; they keep running without us. There is no service to switch off and no key to expire. The MIT licence itself carries no warranty; any warranty, SLA or liability is what is agreed for your deployment.</li>
     <li><strong>Exit:</strong> delete <code>witness.bench.json</code> and the workflow step. Receipts you kept stay verifiable with the same tag.</li>
   </ul>
 
   <h3>Risks, answered straight</h3>
-  <details><summary>It runs our tests many times. Is it slow?</summary><p>Yes, by design: one run of your suite for the baseline and one per mutant, so a gate takes roughly (mutants + 1) × your suite time. Gate the behaviour-critical files, set <code>cap</code>, and run a large suite nightly rather than per pull request. witness refuses a bound that is too tight instead of quietly scoring every timeout as a catch.</p></details>
+  <details><summary>It runs our tests many times. Is it slow?</summary><p>Yes, by design: one run of your suite for the baseline and one per mutant, so a gate takes roughly (mutants + 1) × your suite time. Mutants run one at a time, because each one changes a file in your working copy; your suite may still run its own tests in parallel inside each run. To split a long gate, give separate CI jobs separate files, as this repository's own CI does. Gate the behaviour-critical files, set <code>cap</code>, and run a large suite nightly rather than per pull request. witness refuses a bound that is too tight instead of quietly scoring every timeout as a catch.</p></details>
   <details><summary>What if our tests are flaky?</summary><p>Then the gate is as flaky as they are. A test that fails at random can make a mutant look caught when it was the flake that failed. witness only refuses a baseline that is red on its single honest run; it cannot see a flake that happened to pass. Gate the files whose tests are deterministic first, and treat a survivor that comes and goes between runs as a flaky test to fix.</p></details>
   <details><summary>Some survivors can never be killed.</summary><p>True — equivalent mutants are a known floor of mutation testing. They go in <code>witness.baseline.json</code> with an argued reason; each is tied to the exact line and lapses when that line changes. This repo's own gate carries <b id="risk-baseline">its</b> exemptions in public, each with its reason.</p></details>
   <details><summary>Does a clean gate mean our code is correct?</summary><p>No. It means your tests notice each of the <b class="k-ops">…</b> kinds of one-operator change at every site in the files you named. That is a strong, specific statement about the tests — not a proof that the code meets its requirements.</p></details>

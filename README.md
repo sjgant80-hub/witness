@@ -169,6 +169,9 @@ function that throws on hostile input (`action-dogfood`).
   documented it, so named fuzz targets were silently not fuzzed.
 - **The landing proves itself monthly.** The `landing` workflow now fails unless the fresh vercel/ms anchor equals the
   committed one, and says whether a mismatch is the gate changing or the result changing (`landing/check.mjs`).
+  Its first run under v0.7 said INSTRUMENT CHANGED, because the anchor covers witness.mjs; the verdict was the same
+  (15 killed, 2 survived). The landing was re-minted from that run's artifact and the earlier receipt kept, with its
+  reason, under `landing/history/`.
 - **Every CI gate keeps a receipt.** Each gate job writes witness's verdict with the commit, run, runner and the SHA-256
   of every file it covered (`receipts/stamp.mjs`); the receipts are committed under `receipts/ci/` and the live page
   shows a result only while the files it serves still hash the same.

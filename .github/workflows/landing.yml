@@ -31,20 +31,22 @@ jobs:
         with:
           node-version: '20'
 
+      # Cloned into a folder named `ms`: the receipt records the repo by its folder name, so this is the name
+      # landing/README.md tells anyone reproducing it to use, and the committed receipt is this run's file verbatim.
       - name: clone the external library at a pinned commit
         run: |
           set -e
-          git clone --quiet "$EXT_REPO" _ext
-          cd _ext
+          git clone --quiet "$EXT_REPO" ms
+          cd ms
           git checkout --quiet "$EXT_SHA"
           echo "landed on $(git remote get-url origin) @ $(git rev-parse HEAD)"
 
       - name: install the library's own devDependencies
-        working-directory: _ext
+        working-directory: ms
         run: npm install --no-audit --no-fund --loglevel=error
 
       - name: declare what to gate (the adoption file — one file, this is the whole integration)
-        working-directory: _ext
+        working-directory: ms
         run: |
           cat > witness.bench.json <<'JSON'
           { "files": ["index.js"], "testCommand": "npx mocha tests.js", "cap": 200, "timeout": 120000 }
@@ -56,11 +58,11 @@ jobs:
         continue-on-error: true
         run: |
           WITNESS_DIR="$GITHUB_WORKSPACE"
-          cd _ext
+          cd ms
           GITHUB_WORKSPACE="$PWD" node "$WITNESS_DIR/ci.mjs"
 
       - name: show the receipt
-        working-directory: _ext
+        working-directory: ms
         run: |
           echo "=== Proof-of-Play receipt (external landing) ==="
           cat witness-receipt.json
@@ -69,7 +71,7 @@ jobs:
           node -e "process.stdout.write(require('$GITHUB_WORKSPACE/landing/ms-receipt.json').hash + '\n')"
 
       - name: the anchor reproduces the committed landing (fails if not, and says why)
-        working-directory: _ext
+        working-directory: ms
         run: node "$GITHUB_WORKSPACE/landing/check.mjs" witness-receipt.json "$GITHUB_WORKSPACE/landing/ms-receipt.json"
 
       - name: upload the external proof
@@ -78,7 +80,7 @@ jobs:
         with:
           name: witness-landing-ms
           path: |
-            _ext/witness-receipt.json
-            _ext/witness-verdict.json
-            _ext/witness-badge.json
+            ms/witness-receipt.json
+            ms/witness-verdict.json
+            ms/witness-badge.json
           if-no-files-found: warn

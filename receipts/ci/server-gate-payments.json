@@ -1,0 +1,49 @@
+{
+  "receipt": "witness-ci-gate",
+  "name": "server-gate-payments",
+  "command": "node witness.mjs mutate server/payments.mjs --cap 400 --timeout 120000 --test node --test server/verify-core.test.mjs server/payments.test.mjs",
+  "commit": "5c5da265d167c7e93f96dba685af6b182e41388f",
+  "run": {
+    "id": "42040139503",
+    "attempt": "1",
+    "url": "https://github.com/sjgant80-hub/witness/actions/runs/42040139503",
+    "workflow": "ci",
+    "job": "server-gate"
+  },
+  "runner": {
+    "os": "Linux",
+    "node": "v20.20.2"
+  },
+  "inputs": [
+    {
+      "path": "server/payments.mjs",
+      "sha256": "d2080479b3b8ac46fdd6362b6348e5a490e5895662cfd3947bc47c85ff33ffd4"
+    },
+    {
+      "path": "server/verify-core.test.mjs",
+      "sha256": "dce2aecbce8da314fa381a7b0a3f4aa4e1a6fa2dc27a59c03bb913c947d424f7"
+    },
+    {
+      "path": "server/payments.test.mjs",
+      "sha256": "48c20f927109a6413d63dee10389ea9c0c8c32246de27950689120df83789efe"
+    },
+    {
+      "path": "witness.mjs",
+      "sha256": "54ee52fd685b67d4bcb19609b65a25fc24b040a1aaf08bc7017bad852b7d9fbb"
+    },
+    {
+      "path": "witness.baseline.json",
+      "sha256": "77a4a1fed6f5f5b0469673289e4be37b3f5e2b7944993d332b8fdb3692dd051a"
+    }
+  ],
+  "verdict": {
+    "total": 27,
+    "capped": false,
+    "killed": 27,
+    "survived": [],
+    "ignored": [],
+    "rejectedExemptions": [],
+    "score": 1,
+    "clean": true
+  }
+}

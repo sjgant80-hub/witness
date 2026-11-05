@@ -1,0 +1,45 @@
+{
+  "receipt": "witness-ci-gate",
+  "name": "bench-gate",
+  "command": "node witness.mjs mutate witness-bench.mjs --cap 200 --timeout 600000 --test node --test witness-bench.test.mjs",
+  "commit": "5c5da265d167c7e93f96dba685af6b182e41388f",
+  "run": {
+    "id": "42040139503",
+    "attempt": "1",
+    "url": "https://github.com/sjgant80-hub/witness/actions/runs/42040139503",
+    "workflow": "ci",
+    "job": "bench-gate"
+  },
+  "runner": {
+    "os": "Linux",
+    "node": "v20.20.2"
+  },
+  "inputs": [
+    {
+      "path": "witness-bench.mjs",
+      "sha256": "56c7a528f6e48e72b01609433d94029be0ad4872fbbb71462fc771607d857c5b"
+    },
+    {
+      "path": "witness-bench.test.mjs",
+      "sha256": "d9bdad53876ac413f900a3244359b6a6e34860f44c5681f7ecaa343bf3cb7f4c"
+    },
+    {
+      "path": "witness.mjs",
+      "sha256": "54ee52fd685b67d4bcb19609b65a25fc24b040a1aaf08bc7017bad852b7d9fbb"
+    },
+    {
+      "path": "witness.baseline.json",
+      "sha256": "77a4a1fed6f5f5b0469673289e4be37b3f5e2b7944993d332b8fdb3692dd051a"
+    }
+  ],
+  "verdict": {
+    "total": 36,
+    "capped": false,
+    "killed": 36,
+    "survived": [],
+    "ignored": [],
+    "rejectedExemptions": [],
+    "score": 1,
+    "clean": true
+  }
+}

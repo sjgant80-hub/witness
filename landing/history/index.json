@@ -1,0 +1,13 @@
+[
+  {
+    "hash": "69092a4a5120dd1d5fc65c4eeb05de399a25c5b5eb40cdc4049b7a9ed22bc62d",
+    "fingerprint": "3a7e2302462ac3903856ad350dc174a6c86ebf3c216db646789c46101db84b9b",
+    "receipt": "landing/history/69092a4a-ms-receipt.json",
+    "verdict": "landing/history/69092a4a-ms-verdict.json",
+    "minted": "2026-10-08, witness master 912068c; the same gate fingerprint held through f736214",
+    "why": "the gate before v0.7; same 15 killed, 2 survived",
+    "replacedBy": "52dd47c0fa30ae9ae24ad0dbb0337624d10ccad9d3270d8862818be90890e9f8",
+    "replacedBecause": "v0.7 changed witness.mjs (the symlink-safe entry guard and the masker's newline stop), and the gate fingerprint covers witness.mjs, so the anchor moved while the verdict did not. landing run 42040159421 said INSTRUMENT CHANGED, as landing/check.mjs is built to.",
+    "replacedRun": "https://github.com/sjgant80-hub/witness/actions/runs/42040159421"
+  }
+]

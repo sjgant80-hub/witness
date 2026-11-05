@@ -1,0 +1,49 @@
+{
+  "receipt": "witness-ci-gate",
+  "name": "case-gate",
+  "command": "node witness.mjs mutate case/witnesscase.mjs --cap 400 --timeout 120000 --test node --test case/witnesscase.test.mjs",
+  "commit": "5c5da265d167c7e93f96dba685af6b182e41388f",
+  "run": {
+    "id": "42040139503",
+    "attempt": "1",
+    "url": "https://github.com/sjgant80-hub/witness/actions/runs/42040139503",
+    "workflow": "ci",
+    "job": "case-gate"
+  },
+  "runner": {
+    "os": "Linux",
+    "node": "v20.20.2"
+  },
+  "inputs": [
+    {
+      "path": "case/witnesscase.mjs",
+      "sha256": "55b229eba5267bacbda5f45368ab93f0c3be7e0dcb0138a81f672b66ddfd0573"
+    },
+    {
+      "path": "case/witnesscase.test.mjs",
+      "sha256": "65a2c45eea420c29f14ff6acddbd96527c9fd47877042858e823ce6e13c4c4f1"
+    },
+    {
+      "path": "case/witness.baseline.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "vendor/sovereign-enterprise/basis.json",
+      "sha256": "83e9c2effa2f81596dcfa7110f030940032c1910cdf928d27d628ae59d73bb42"
+    },
+    {
+      "path": "witness.mjs",
+      "sha256": "54ee52fd685b67d4bcb19609b65a25fc24b040a1aaf08bc7017bad852b7d9fbb"
+    }
+  ],
+  "verdict": {
+    "total": 21,
+    "capped": false,
+    "killed": 21,
+    "survived": [],
+    "ignored": [],
+    "rejectedExemptions": [],
+    "score": 1,
+    "clean": true
+  }
+}
