@@ -165,6 +165,17 @@ function that throws on hostile input (`action-dogfood`).
   in thirteen repositories (witness and those twelve) and on vercel/ms's `index.js`, the change alters no mutant site,
   so no existing verdict moves. The baselined loop bounds it touches are re-checked on every push by
   `tools/mask-bounds.mjs`, a differential run with a control it must detect.
+- **Five of witness's own exemptions were wrong, and are now killed instead.** `witness.baseline.json` called five
+  mutants of the masker's regex scanner equivalent: regexAllowed's start-of-file guard and its default result, and the
+  regex body's escape, class-open and class-close checks. They are not. Each makes the scanner call a division a regex,
+  or miss where a regex ends, and run on past a line comment, whose operators are then offered as mutants no test can
+  kill. Consuming a regex never masks anything, so every regex test then in the suite passed with each mutant in, and
+  the "zero differing outputs" fuzz in their reasons never put a comment after the slash. One new test does
+  (`a comment after a division or a regex is still masked`) and fails under all five; their entries are gone. The two
+  entries for `while (i < src.length) {` were also one exemption (the baseline is keyed on the mutation and the code
+  line, and three loops share that line), so the receipt showed the string loop's reason for all three. They are now
+  one entry whose reason covers each loop. The baseline went from 10 entries to 4; every one that is left is either
+  re-checked on every push by `tools/mask-bounds.mjs` or argued in full.
 - **The Action's `fuzz` input is back.** v0.6 had it; the proof-of-play rewrite dropped it while this README still
   documented it, so named fuzz targets were silently not fuzzed.
 - **The landing proves itself monthly.** The `landing` workflow now fails unless the fresh vercel/ms anchor equals the

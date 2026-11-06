@@ -1,60 +1,24 @@
 [
   {
-    "line": 116,
+    "line": 129,
     "mutation": "< → <=",
     "snippet": "while (i < src.length) {",
-    "reason": "Equivalent, and checked rather than argued. This is commentMask's outer loop bound. The mutant takes exactly one extra iteration, entered only when i === src.length; there src[i] and src[i+1] are both undefined, which matches none of the three branch guards (they compare against single characters), so the body falls through to i += 1 and the loop exits. No mask write is reached, and mask was allocated at src.length before the loop, so its length and every byte are untouched. The mask is the whole return value. The jump cases were checked too: where i advances by more than one (the backslash skip, the block-comment jump, the newline scan) it either lands exactly on len — the no-op iteration above — or overshoots to len+1, which fails both bounds identically. Verified by differential run: exhaustive over the alphabet the scanner branches on for all lengths 0-4 (4,681 strings), 200,000 random strings of length 5-16, and the non-string inputs. Zero differing masks. Re-checked for v0.7, which added a newline stop inside the string scanner: at i === src.length that test fails too (src[i] is undefined, not a line break), so the extra iteration still writes nothing and exits. The differential run is now re-runnable and runs in CI on every push: node tools/mask-bounds.mjs flips each of commentMask's three loop bounds and its line-comment bound and compares masks over every string of length 0-6 on the twelve characters the scanner branches on (3,257,437 strings), 200,000 seeded random strings of length 5-24, every seventh prefix of eight files in this repo and non-string inputs, with an inverted newline stop as a control it must detect; it fails on any differing mask. Zero differing masks for this bound."
+    "reason": "Equivalent, and checked rather than argued. This one entry covers all three loops in commentMask() whose bound is exactly this line (the outer scanner loop, the regex-body loop and the string-literal loop): the baseline is keyed on the mutation and the code line, so one entry is one exemption for all three, and this reason has to hold for each. In every case the mutant takes exactly one extra iteration, entered only when i === src.length, where src[i] and src[i+1] are undefined. Outer loop: that matches none of the branch guards (each compares against a single character), so the body falls through to i += 1 and exits; no mask write is reached. Regex-body loop: undefined is not a backslash, '[', ']', '/' or a line break, so it only advances i. String loop: undefined is not a backslash, the closing quote or a line break (the v0.7 newline stop), so it only advances i; that loop never writes to the mask, because strings are left mutable on purpose. Where i jumps by two (an escape) it lands on len, the no-op above, or on len+1, which fails every bound identically. The mask, allocated at src.length before the loop, is the whole return value, so mutants() cannot differ. The check is re-runnable and runs in CI on every push, on Linux, macOS and Windows: node tools/mask-bounds.mjs builds commentMask() from the served witness.mjs, flips each of the three loop bounds and the line-comment bound, and compares masks over every string of length 0-6 on the twelve characters the scanner branches on (3,257,437 strings), 200,000 seeded random strings of length 5-24, every seventh prefix of eight files in this repo and non-string inputs, with an inverted newline stop as a control it must detect; any differing mask fails the build. Zero differing masks for each of the three loops."
   },
   {
-    "line": 119,
+    "line": 157,
     "mutation": "< → <=",
     "snippet": "while (i < src.length && src[i] !== '\\n') mask[i++] = 1;",
     "reason": "Equivalent, and checked rather than argued. The line-comment scanner's bound. It can only reach the mutated comparison at i === src.length, i.e. a // comment running to the very end with no trailing newline. There the mutant reads src[src.length] (undefined, which is !== '\\n', so the body runs) and executes mask[i++] = 1 with i === src.length — an integer-indexed write past the end of a Uint8Array, which is silently discarded rather than throwing or creating a property. i becomes len+1, the bound fails, and the outer loop bound fails for both versions. The write index always equals the current i, which is out of range exactly when the extra iteration happens, so it can never land in range. Verified by differential run over 23 targeted end-of-buffer fixtures plus 400,000 random strings: identical on every input."
   },
   {
-    "line": 131,
-    "mutation": "< → <=",
-    "snippet": "while (i < src.length) {",
-    "reason": "Equivalent, and checked rather than argued. The string-literal scanner's bound. This loop never writes to mask at all — string literals are deliberately left mutable, so it only advances i. The single divergent iteration happens on an unterminated string running to the end of the buffer, where src[src.length] is undefined and matches neither the backslash test nor the closing quote, so i becomes len+1 and both the inner and outer bounds then fail identically. The escape skip can overshoot to len+1, which also fails both. Verified by differential run: exhaustive over all 299,593 strings of length 0-6 drawn from every character the scanner branches on, comparing both the mask and the full mutants() output; plus every prefix of every file in this repo (~28,000 truncations, each leaving a different scanner state at the end of the buffer) and 200,000 random strings. Zero differences. Re-checked for v0.7, which added a newline stop inside the string scanner: at i === src.length that test fails too (src[i] is undefined, not a line break), so the single divergent iteration still only advances i past the end. The differential run is now re-runnable and runs in CI on every push: node tools/mask-bounds.mjs flips each of commentMask's three loop bounds and its line-comment bound and compares masks over every string of length 0-6 on the twelve characters the scanner branches on (3,257,437 strings), 200,000 seeded random strings of length 5-24, every seventh prefix of eight files in this repo and non-string inputs, with an inverted newline stop as a control it must detect; it fails on any differing mask. Zero differing masks for this bound."
-  },
-  {
-    "line": 416,
+    "line": 501,
     "mutation": "< → <=",
     "snippet": "const timeout = toArg !== -1 && toArg < (rest.indexOf('--test') === -1 ? Infinity : rest.i",
     "reason": "Equivalent by construction. The comparison is toArg < indexOf('--test'), guarded by toArg !== -1. Inclusive versus exclusive can only change the result when toArg equals the right-hand operand. With no --test present the operand is Infinity, and toArg is an Array.indexOf result, i.e. a finite non-negative integer once -1 is excluded by the first conjunct, so equality is unreachable. With --test present the operand is indexOf('--test'), and two DIFFERENT strings cannot share an index in the same array, so toArg === that index is likewise unreachable. There is no argv, well-formed or hostile, on which the two differ."
   },
   {
-    "line": 118,
-    "mutation": "=== → !==",
-    "snippet": "if (prevCode === null) return true;                 // start of file",
-    "reason": "Equivalent, and checked rather than argued. regexAllowed's start-of-file guard. Whether a slash at the very start of the file opens a regex only shifts which characters the regex-consumer steps over on its way to the first real token; those characters are never mutable operators, and the consumer lands before any real operator either way. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
-  },
-  {
-    "line": 120,
-    "mutation": "return false → return true",
-    "snippet": "return false;",
-    "reason": "Equivalent, and checked rather than argued. regexAllowed's default result. Treating a slash after a non-opener character as a regex instead of division only changes where the consumer starts; the scanned characters hold no mutable operators and no comment boundary is moved onto real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
-  },
-  {
-    "line": 145,
-    "mutation": "=== → !==",
-    "snippet": "if (ch === '\\\\') { i += 2; continue; }        // an escape covers the next character whole",
-    "reason": "Equivalent, and checked rather than argued. The regex body's escape check. Flipping it changes how the escape is stepped over, but a regex body contains no mutable operators and the consumer still terminates before real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
-  },
-  {
-    "line": 146,
-    "mutation": "=== → !==",
-    "snippet": "if (ch === '[') inClass = true;",
-    "reason": "Equivalent, and checked rather than argued. The regex character-class open. Flipping it changes only how the class boundary is tracked inside the regex body, which holds no mutable operators, and the consumer still terminates before real code. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
-  },
-  {
-    "line": 147,
-    "mutation": "=== → !==",
-    "snippet": "else if (ch === ']') inClass = false;",
-    "reason": "Equivalent, and checked rather than argued. The regex character-class close, mirror of line 146. It only affects class tracking inside the regex body, which holds no mutable operators. Differential-fuzzed over 8,000+ random regex/comment/string strings, comparing mutants() output against the unmutated scanner: zero differing outputs."
-  },
-  {
-    "line": 236,
+    "line": 246,
     "mutation": "!== → ===",
     "snippet": "const detached = process.platform !== 'win32';",
     "reason": "Reviewed exemption, argued not equivalent-by-value. This sets `detached` for the spawned test process, a runtime OS process-group choice. On a single platform the two values do not change what mutants() produces or which assertions the suite makes — they change only whether a timed-out child's grandchildren are reaped as a group. Killing it would need a deliberately-orphaning, platform-specific, flaky test. Confirmed suite-invariant at the mutants() level by differential fuzz over 8,000+ inputs; the runtime reaping path is exercised by the timeout tests. Accepted as platform-behavioral, not proven value-equivalent."

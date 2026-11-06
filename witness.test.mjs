@@ -755,6 +755,21 @@ test('a real comment is still masked, and a string is still mutable', () => {
   assert.deepEqual(mutants('const s = "a > b"; const live = c === d;').map(m => m.from).sort(), ['===', '>']);
 });
 
+test('a comment after a division or a regex is still masked', () => {
+  // ⚑ The other side of the regex scanner's bias. Consuming a regex never masks anything, so every test above
+  // still passes when the scanner calls a division a regex, or misses where a regex ends: it simply runs on, past
+  // a line comment, and that comment's operators are offered as mutants no test can ever kill — false survivors
+  // on the user's verdict, the defect v0.4 removed. witness.baseline.json used to call five of the scanner's own
+  // mutants equivalent on that ground (regexAllowed's start-of-file guard and default result, the regex body's
+  // escape, class-open and class-close checks). A comment after the slash tells every one of them apart, so they
+  // are killed here instead of exempted.
+  assert.deepEqual(mutants('const half = n / 2; // n > 0 is checked by the caller').map(m => m.from), [],
+    'a comment after a division was read as code');
+  assert.deepEqual(mutants('const re = /ab/; // x > y').map(m => m.from), [], 'a comment after a regex was read as code');
+  assert.deepEqual(mutants('const re = /ab/;\n// x > y\nconst live = a === b;').map(m => m.from), ['==='],
+    'a regex ran on past its own line');
+});
+
 test('a character class holding a slash does not end the regex early', () => {
   const src = `const re = /[/]x/; const live = a > b;`;
   assert.deepEqual(mutants(src).map(m => m.from), ['>']);
