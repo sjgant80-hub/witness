@@ -37,7 +37,9 @@ The entire integration is one file dropped into the subject at CI time:
   anchor does not cover that field, so the hash is the same. The workflow now clones into `ms`, the name the earlier
   receipt carried. The next run, [42089760341](https://github.com/sjgant80-hub/witness/actions/runs/42089760341) on
   commit `00b8ffe`, said **REPRODUCED**, and its `witness-receipt.json` and `witness-verdict.json` equal
-  `ms-receipt.json` and `ms-verdict.json` byte for byte.
+  `ms-receipt.json` and `ms-verdict.json` byte for byte. So did
+  [42135003918](https://github.com/sjgant80-hub/witness/actions/runs/42135003918), dispatched on commit `9c83bc2`
+  (the commit that retired five of witness's own exemptions; witness.mjs unchanged, so the gate fingerprint holds).
 
 ## History (`history/`)
 

@@ -170,7 +170,8 @@ function that throws on hostile input (`action-dogfood`).
   regex body's escape, class-open and class-close checks. They are not. Each makes the scanner call a division a regex,
   or miss where a regex ends, and run on past a line comment, whose operators are then offered as mutants no test can
   kill. Consuming a regex never masks anything, so every regex test then in the suite passed with each mutant in, and
-  the "zero differing outputs" fuzz in their reasons never put a comment after the slash. One new test does
+  the "zero differing outputs" fuzz quoted in their reasons could only see a difference on a comment that holds an
+  operator and follows the slash, which it evidently never generated. One new test puts exactly that in front of them
   (`a comment after a division or a regex is still masked`) and fails under all five; their entries are gone. The two
   entries for `while (i < src.length) {` were also one exemption (the baseline is keyed on the mutation and the code
   line, and three loops share that line), so the receipt showed the string loop's reason for all three. They are now

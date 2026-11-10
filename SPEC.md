@@ -46,6 +46,9 @@ next to the source (or in `cwd`) is auto-loaded.
    - child exit `0` ⇒ tests passed ⇒ mutant survived (candidate test-theatre) → checked against the baseline.
    - child exit non-zero, **or a timeout** ⇒ tests did not pass ⇒ **mutant KILLED** (the line is guarded).
    - a surviving mutant whose `(mutation, snippet)` is in the baseline ⇒ **IGNORED** (reviewed-equivalent).
+     The key is the mutation and the code line (trimmed, first 90 characters), not the line number, so one entry covers every line
+     whose text is identical, and its reason has to hold for each; a second entry with the same key replaces
+     the first.
    - **zero mutants** ⇒ `clean: false`, `score: null`, `noMutants: true`. A gate that found nothing
      to mutate has tested nothing, and must not be reported as a pass.
 5. `finally`: write `original` back to `srcPath`; delete the sidecar.

@@ -379,6 +379,7 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
   <details><summary>We already run a mutation-testing tool. Why this?</summary><p>If you run one, keep it: the method is the same. Established open-source frameworks such as Stryker (JavaScript, TypeScript, C# and Scala) and PIT (Java) offer many more kinds of mutation than witness's <b class="k-ops">…</b>. witness is deliberately small: two zero-dependency files you can read before you pin them, one flip per mutant so every survivor names one line, refusals instead of greens (an empty run, a red baseline, a too-tight bound, an exemption without a reason), and a receipt whose anchor anyone re-derives by re-running it. Use it where you need that receipt or that readability; it can run beside a larger tool.</p></details>
   <details><summary>Will it block an urgent fix?</summary><p>Only once you make it a required check (adoption step 3), and then like any other required check: whoever your branch protection already lets merge past a red check still can. It mutates only the files in <code>witness.bench.json</code>, so a fix to other files leaves its verdict where it was. A red gate names the line and the flip, so the usual follow-up is one test after the fix ships. If the gate is slow for your suite, run it nightly (adoption step 4) instead of as a per-pull-request required check.</p></details>
   <details><summary>Which languages?</summary><p>It is built for JavaScript and TypeScript-style sources: the comment masker understands that syntax (comments, strings, templates, regexes). The test command can be anything that exits non-zero on failure.</p></details>
+  <details><summary>We are not on GitHub Actions.</summary><p>The Action is a convenience around two commands, so any CI that can run Node works (this repository's own CI runs it on Node 20). Clone the tag into the job, then run <code>node .witness/witness-bench.mjs prove . &gt; witness-receipt.json</code>: it reads your <code>witness.bench.json</code> and exits 0 only when every file was gated clean (no survivor outside your reviewed exemptions), 1 when a mutant survived or a file could not be gated (a red baseline, nothing to mutate), and 2 when it could not start at all (no readable <code>witness.bench.json</code>, for one); the receipt is a file your CI keeps as an artifact. For one file at a time, <code>node .witness/witness.mjs mutate &lt;file&gt; --test &lt;your test command&gt;</code> exits 0 when clean and 1 otherwise. What you give up is the GitHub step summary and badge, which the Action writes from the same verdict.</p></details>
   <details><summary>It runs code. Is that safe?</summary><p>It runs your own test command on your own runner — what CI already does. The optional verify server refuses unknown repositories unless it is deployed in a disposable container, and says so rather than pretending.</p></details>
   <details><summary>Who else uses it?</summary><p>No outside team has it in their CI yet. The proof so far is the landing above: the gate run on a widely used external library, reproduced on GitHub's runner, receipt committed. You would be among the first; the MIT licence means that carries no lock-in risk.</p></details>
   <details><summary>What if the supplier disappears?</summary><p>Nothing changes. Two files, MIT, pinned by tag, no service behind them.</p></details>
@@ -408,8 +409,8 @@ PROOF_ASSESSOR=.witness/witness-bench.mjs \
   the gate self-heals from a sidecar after any interrupt. A build gate has to be hardened against the exact bug classes it hunts.</p>
   <p class="note">The exemptions get the same treatment. Re-checking its own baseline for v0.7 found that the reasons given for the
   regex scanner's mutants were wrong: each mutant made the scanner run on past a line comment, so the comment's operators
-  would have been offered as mutants no test can kill. The fuzz behind those reasons had never put a comment after the
-  slash. A test that does now kills every one of them, and their exemptions are gone; the receipt for
+  would have been offered as mutants no test can kill. The fuzz behind those reasons could only see that on a comment
+  holding an operator after the slash, and it found none. A test that puts one there now kills every one of them, and their exemptions are gone; the receipt for
   <code>witness.mjs</code> in the blueprint is the run that proves it. An exemption is a claim, and a claim is re-checked.</p>
 
   <footer>
@@ -553,7 +554,13 @@ run('case', async () => {
     const input = Object.fromEntries(Object.entries(ids).map(([k, id]) => [k, num(id)]));
     input.share = num('in-share') / 100;
     const r = witnessCase(basis, input);
-    if (!r.ok) { $('#case-why').textContent = 'Check the inputs: ' + r.why; return; }
+    if (!r.ok) {
+      // the kernel takes the share as 0 to 1; this form asks for a percentage, so say it in the form's terms
+      $('#case-why').textContent = 'Check the inputs: ' + (/share/.test(r.why) ? 'the share of the checking the gate takes over: 0 to 100 (%)'
+        : /^years/.test(r.why) ? 'years: a whole number from 1 to 10' : r.why);
+      $('#case-big').innerHTML = ''; $('#case-rows').innerHTML = '';   // never leave the last good answer showing beside an error
+      return;
+    }
     $('#case-why').textContent = '';
     const y = r.inputs.years;
     $('#case-years-h').textContent = `over ${y} year${y === 1 ? '' : 's'}`;
