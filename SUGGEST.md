@@ -90,7 +90,8 @@ The second half of C1 held: no suggested test failed on the real code. The first
 - **One "contradiction", and it is weak.** the-dreamer line 100: the person's equivalence reason holds for every
   well-formed store. Suggest killed the mutant only on a store with no `subjects` key, where the real code and the
   mutant throw different error messages. A real difference, but only on invalid input.
-- **Most of the 22 kills check the answer, not an error message.**
+- **The 22 kills check answers, not error messages.** Their 46 tests (one per candidate mutant) were decoded from the
+  generated files: 45 check the real code's answer and 1 checks the error it throws.
 - **Why it missed, by kind:**
   - **7 of forge.mjs's 8 misses:** the search found an input where the answers differ, but the test written from it
     did not pass on the real code and fail on the mutant. This is the biggest gap, and it is in writing the test, not
