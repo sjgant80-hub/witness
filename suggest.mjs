@@ -30,6 +30,12 @@ const unb64 = (s) => deserialize(Buffer.from(s, 'base64'));
 const nodeCmd = (cmd) => (cmd[0] === 'node' ? [process.execPath, ...cmd.slice(1)] : cmd);
 const cleanEnv = () => { const e = { ...process.env }; delete e.NODE_OPTIONS; delete e.NODE_TEST_CONTEXT; return e; };
 
+// recording needs module.registerHooks (Node 22.15 / 23.5 and later). On an older Node, suggest says so and does not
+// pretend: a record with no calls would look like "nothing found" when nothing was looked at.
+import * as nodeModule from 'node:module';   // a namespace import: a named one would fail to load on Node 20
+export const SUPPORTED = typeof nodeModule.registerHooks === 'function';
+export const NEEDS = 'witness suggest needs Node 22.15 or later (it records your tests\' calls through module.registerHooks); this is Node ' + process.versions.node;
+
 /** the exported names of a module, and the keys of its default export when that is a plain object of functions */
 async function exportsOf(url) {
   const ns = await import(url + (url.includes('?') ? '&' : '?') + 'witness-names');
@@ -40,6 +46,7 @@ async function exportsOf(url) {
 
 /** step 1: run the tests on the real code and record every call to the kernel's exported functions */
 export async function record(srcPath, testCmd, { cwd = process.cwd(), timeout = 600000 } = {}) {
+  if (!SUPPORTED) throw new Error(NEEDS);
   const src = pathToFileURL(realpathSync(srcPath)).href, ex = await exportsOf(src);
   const dir = mkdtempSync(join(tmpdir(), 'witness-suggest-'));
   try {
@@ -171,6 +178,7 @@ export async function suggest(srcPath, { survivors, testCmd, cwd = process.cwd()
 }
 
 async function main() {
+  if (!SUPPORTED) { console.error('✗ ' + NEEDS); process.exit(2); }
   const a = process.argv.slice(2), ti = a.indexOf('--test');
   const head = ti >= 0 ? a.slice(0, ti) : a, testCmd = ti >= 0 ? a.slice(ti + 1) : null;
   const opt = (f) => { const i = head.indexOf(f); return i >= 0 ? head[i + 1] : undefined; };

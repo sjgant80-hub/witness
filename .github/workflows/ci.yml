@@ -201,6 +201,37 @@ jobs:
           path: _receipts/
           if-no-files-found: warn
 
+  # witness suggest (SUGGEST.md): a survivor becomes a verified killing test. Its recorder needs module.registerHooks,
+  # so this job runs on Node 22 (the test job's Node 20 skips the end-to-end tests and says why). The pure kernel,
+  # suggest-core.mjs, faces the same bar as the rest of the rail: a mutation gate with no exemptions.
+  suggest-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: suggest's own tests, end to end included
+        run: node --test suggest.test.mjs
+      - name: witness gates the suggest kernel (fast tests; the end-to-end ones run above)
+        shell: bash
+        run: |
+          set +e
+          node witness.mjs mutate suggest-core.mjs --cap 2000 --timeout 120000 --baseline suggest.baseline.json --test node --test --test-skip-pattern=e2e suggest.test.mjs > gate.json
+          code=$?
+          set -e
+          cat gate.json
+          node receipts/stamp.mjs suggest-core-gate gate.json "node witness.mjs mutate suggest-core.mjs --cap 2000 --timeout 120000 --baseline suggest.baseline.json --test node --test --test-skip-pattern=e2e suggest.test.mjs" suggest-core.mjs suggest.test.mjs suggest.baseline.json witness.mjs
+          exit $code
+      - name: keep the receipt (committed verbatim under receipts/ci/, read by the live page)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: receipt-suggest-core-gate
+          path: _receipts/
+          if-no-files-found: warn
+
   action-dogfood:
     runs-on: ubuntu-latest
     steps:

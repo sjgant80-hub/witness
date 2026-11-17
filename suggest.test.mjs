@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { serialize, deserialize } from 'node:v8';
 import { shape, same, hints, alts, variants, candidatesFor, pick, lit, renderTest, outcome } from './suggest-core.mjs';
-import { inputsFor, record, suggest } from './suggest.mjs';
+import { inputsFor, record, suggest, SUPPORTED, NEEDS } from './suggest.mjs';
+// the end-to-end tests record through module.registerHooks (Node 22.15+); on an older Node they skip and say why
+const e2e = { skip: SUPPORTED ? false : NEEDS };
 import { mutants, hostileInputs } from './witness.mjs';
 
 // ── shape: a plain copy that can be compared and stored ─────────────────────────
@@ -327,7 +329,7 @@ test('inputsFor: recorded calls first, then their neighbours, then plain hostile
   assert.equal(inputsFor([], ['h'], '').length, 1 + plain - 2, 'no args, then each storable hostile input (a cycle stores; the two toxic ones do not)');
 });
 
-test('e2e record: running the tests records the calls they make to the kernel, through a test runner\'s child process', async () => {
+test('e2e record: running the tests records the calls they make to the kernel, through a test runner\'s child process', e2e, async () => {
   const r = await record('fixtures/boundary.mjs', ['node', '--test', 'fixtures/boundary.theatre.test.mjs']);
   assert.equal(r.testsPassed, true);
   assert.deepEqual(r.fnNames, ['isPositive']);
@@ -336,7 +338,7 @@ test('e2e record: running the tests records the calls they make to the kernel, t
   assert.equal(bad.testsPassed, false); assert.equal(bad.status, 3); assert.deepEqual(bad.calls, []);
 });
 
-test('e2e suggest: the theatre fixture\'s survivor gets a test that passes on the real code and fails on the mutant; the source is never touched', async () => {
+test('e2e suggest: the theatre fixture\'s survivor gets a test that passes on the real code and fails on the mutant; the source is never touched', e2e, async () => {
   const before = readFileSync('fixtures/boundary.mjs', 'utf8');
   const dir = mkdtempSync(join(tmpdir(), 'wsug-e2e-')), out = join(dir, 'out.test.mjs');
   try {
@@ -357,7 +359,7 @@ test('e2e suggest: the theatre fixture\'s survivor gets a test that passes on th
 import { readdirSync } from 'node:fs';
 const require_ls = (d) => readdirSync(d);
 
-test('e2e suggest: an equivalent mutant gets no test, and says why', async () => {
+test('e2e suggest: an equivalent mutant gets no test, and says why', e2e, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wsug-eq-'));
   try {
     writeFileSync(join(dir, 'k.mjs'), 'export const big = (n) => Math.max(n, 0) >= 0;\n');
@@ -373,7 +375,7 @@ test('e2e suggest: an equivalent mutant gets no test, and says why', async () =>
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('e2e suggest: a mutant that loops forever on an input is caught by the bound and still gets its test', async () => {
+test('e2e suggest: a mutant that loops forever on an input is caught by the bound and still gets its test', e2e, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wsug-hang-'));
   try {
     writeFileSync(join(dir, 'h.mjs'), 'export function count(n) { let i = 0; while (i < n) i = i + 1; return i; }\n');
