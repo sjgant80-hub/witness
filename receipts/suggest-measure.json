@@ -1,0 +1,322 @@
+{
+ "cases": [
+  {
+   "repo": "fall-kit",
+   "commit": "a98efc4",
+   "kernel": "core/node.mjs",
+   "test": [
+    "node",
+    "core/node.test.mjs"
+   ],
+   "witness": "82bf496",
+   "total": 248,
+   "S0": [
+    "87 < → <= :: const better = best === null || (live && !best.live) || (live === best.live && ((untried &",
+    "368 || → && :: if (!a.ok || a.t !== 'answer' || a.to !== author.id || a.id !== n.job || a.skill !== n.ski",
+    "334 return false → return true :: const check = async (skill, answer) => { try { return (await (typeof checks[skill] === 'fu"
+   ],
+   "S1": [
+    "87 < → <= :: const better = best === null || (live && !best.live) || (live === best.live && ((untried &"
+   ],
+   "S2": [
+    "87 < → <= :: const better = best === null || (live && !best.live) || (live === best.live && ((untried &",
+    "368 || → && :: if (!a.ok || a.t !== 'answer' || a.to !== author.id || a.id !== n.job || a.skill !== n.ski",
+    "334 return false → return true :: const check = async (skill, answer) => { try { return (await (typeof checks[skill] === 'fu"
+   ],
+   "recorded": 176,
+   "killable": 2,
+   "suggested": 0,
+   "hits": [],
+   "contradicts": [],
+   "why": [
+    "87 < → <= :: const better = best === null || (live && !best.live) || (live === best.live && ((untried & — none of the 3008 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "368 || → && :: if (!a.ok || a.t !== 'answer' || a.to !== author.id || a.id !== n.job || a.skill !== n.ski — none of the 2991 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "334 return false → return true :: const check = async (skill, answer) => { try { return (await (typeof checks[skill] === 'fu — none of the 2991 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)"
+   ],
+   "file": null,
+   "passesOnReal": null
+  },
+  {
+   "repo": "fallkard-forge",
+   "commit": "d15ee24",
+   "kernel": "png.mjs",
+   "test": [
+    "node",
+    "--test",
+    "test.mjs",
+    "forge-estate.test.mjs",
+    "art-band.test.mjs"
+   ],
+   "witness": "82bf496",
+   "total": 7,
+   "S0": [
+    "17 < → <= :: for (let n = 0; n < 256; n++) {",
+    "19 < → <= :: for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);",
+    "27 < → <= :: for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);"
+   ],
+   "S1": [
+    "17 < → <= :: for (let n = 0; n < 256; n++) {"
+   ],
+   "S2": [
+    "17 < → <= :: for (let n = 0; n < 256; n++) {"
+   ],
+   "recorded": 142,
+   "killable": 2,
+   "suggested": 2,
+   "hits": [
+    "19 < → <= :: for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);",
+    "27 < → <= :: for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);"
+   ],
+   "contradicts": [],
+   "why": [
+    "17 < → <= :: for (let n = 0; n < 256; n++) { — none of the 1008 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)"
+   ],
+   "passesOnReal": true,
+   "fileSha256": "cd1de1b2c0d25864d754eb6dbce8511cefcfc9af2dfdcc34356863f5b93fd12a",
+   "fileTests": 2
+  },
+  {
+   "repo": "fallkard-forge",
+   "commit": "d15ee24",
+   "kernel": "forge.mjs",
+   "test": [
+    "node",
+    "--test",
+    "test.mjs",
+    "card.test.mjs",
+    "forge-estate.test.mjs",
+    "forge.green.test.mjs",
+    "reader.test.mjs"
+   ],
+   "witness": "82bf496",
+   "total": 62,
+   "S0": [
+    "226 >= → > :: const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };",
+    "142 > → >= :: const kw = nul > 0 ? c.data.toString('latin1', 0, nul) : '';",
+    "48 < → <= :: if (nul < 0) continue;",
+    "286 === → !== :: const note = r.tierCheck === 'overclaim' ? `  ✗ OVERCLAIM — the card says ${r.manifest.rar",
+    "110 && → || :: const o = (opts && typeof opts === 'object') ? opts : {};",
+    "128 && → || :: signer: (typeof sign === 'function' && signer) ? String(signer) : null,",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b",
+    "95 return false → return true :: } catch { return false; }"
+   ],
+   "S1": [
+    "226 >= → > :: const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };",
+    "142 > → >= :: const kw = nul > 0 ? c.data.toString('latin1', 0, nul) : '';",
+    "48 < → <= :: if (nul < 0) continue;"
+   ],
+   "S2": [
+    "226 >= → > :: const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };",
+    "142 > → >= :: const kw = nul > 0 ? c.data.toString('latin1', 0, nul) : '';",
+    "48 < → <= :: if (nul < 0) continue;",
+    "286 === → !== :: const note = r.tierCheck === 'overclaim' ? `  ✗ OVERCLAIM — the card says ${r.manifest.rar",
+    "128 && → || :: signer: (typeof sign === 'function' && signer) ? String(signer) : null,",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b",
+    "95 return false → return true :: } catch { return false; }"
+   ],
+   "recorded": 324,
+   "killable": 6,
+   "suggested": 1,
+   "hits": [
+    "110 && → || :: const o = (opts && typeof opts === 'object') ? opts : {};"
+   ],
+   "contradicts": [],
+   "why": [
+    "226 >= → > :: const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; }; — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "142 > → >= :: const kw = nul > 0 ? c.data.toString('latin1', 0, nul) : ''; — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "48 < → <= :: if (nul < 0) continue; — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "286 === → !== :: const note = r.tierCheck === 'overclaim' ? `  ✗ OVERCLAIM — the card says ${r.manifest.rar — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "128 && → || :: signer: (typeof sign === 'function' && signer) ? String(signer) : null, — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "178 || → && :: if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return refuse('b — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "95 return false → return true :: } catch { return false; } — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant"
+   ],
+   "passesOnReal": true,
+   "fileSha256": "0716094ff4e19ea90fc872df372f4afb07b784b2e4ebc8a12932df4ae9b65412",
+   "fileTests": 1
+  },
+  {
+   "repo": "fallkard-forge",
+   "commit": "d15ee24",
+   "kernel": "lineage.mjs",
+   "test": [
+    "node",
+    "--test",
+    "test.mjs",
+    "forge-estate.test.mjs"
+   ],
+   "witness": "82bf496",
+   "total": 34,
+   "S0": [
+    "101 < → <= :: const tierIndex = (t) => { const i = TIER_ORDER.indexOf(String(t)); return i < 0 ? 0 : i; ",
+    "37 || → && :: catch (err) { unreadable.push({ name, reason: String(err.message || err) }); continue; }",
+    "109 || → && :: const provable = e.status === 'broken-seal' || e.status === 'cycle'"
+   ],
+   "S1": [
+    "101 < → <= :: const tierIndex = (t) => { const i = TIER_ORDER.indexOf(String(t)); return i < 0 ? 0 : i; ",
+    "37 || → && :: catch (err) { unreadable.push({ name, reason: String(err.message || err) }); continue; }"
+   ],
+   "S2": [
+    "101 < → <= :: const tierIndex = (t) => { const i = TIER_ORDER.indexOf(String(t)); return i < 0 ? 0 : i; ",
+    "37 || → && :: catch (err) { unreadable.push({ name, reason: String(err.message || err) }); continue; }",
+    "109 || → && :: const provable = e.status === 'broken-seal' || e.status === 'cycle'"
+   ],
+   "recorded": 11,
+   "killable": 1,
+   "suggested": 0,
+   "hits": [],
+   "contradicts": [],
+   "why": [
+    "101 < → <= :: const tierIndex = (t) => { const i = TIER_ORDER.indexOf(String(t)); return i < 0 ? 0 : i;  — none of the 129 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "37 || → && :: catch (err) { unreadable.push({ name, reason: String(err.message || err) }); continue; } — none of the 127 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "109 || → && :: const provable = e.status === 'broken-seal' || e.status === 'cycle' — none of the 127 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)"
+   ],
+   "file": null,
+   "passesOnReal": null
+  },
+  {
+   "repo": "the-dreamer",
+   "commit": "178eca0",
+   "kernel": "dreamer.mjs",
+   "test": [
+    "node",
+    "test.mjs"
+   ],
+   "witness": "82bf496",
+   "total": 79,
+   "S0": [
+    "141 >= → > :: const salient = sub.episodes.some(e => e.conf >= 1.5);",
+    "73 < → <= :: if (report.merged < 0) report.merged = 0;",
+    "118 < → <= :: if (support.length < minInstances) continue;",
+    "72 === → !== :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "133 === → !== :: const type = f.p === 'isa' ? 'generalizes' : FUNCTIONAL.has(f.p) ? 'attribute' : 'relates'",
+    "169 === → !== :: const anyExplicitResolved = [...store.facts.values()].filter(f => f.s === s && f.p === p &",
+    "191 === → !== :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 === → !== :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "203 === → !== :: if (q.all) { got = fn(store, q).sort(); ok = JSON.stringify(got) === JSON.stringify([...q.",
+    "60 !== → === :: if (f.superseded || f.p !== pred || f.s !== x) continue;",
+    "107 !== → === :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "176 !== → === :: if (f.s !== C || f.p !== p || f.superseded) continue;",
+    "34 && → || :: return { s, p, o, conf, day, text: (ep && ep.text) ? String(ep.text) : (s && p ? `${s} ${p",
+    "34 && → || :: return { s, p, o, conf, day, text: (ep && ep.text) ? String(ep.text) : (s && p ? `${s} ${p",
+    "72 && → || :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "90 && → || :: const subs = new Set([...store.facts.values()].filter(f => f.p === p && !f.superseded).map",
+    "100 && → || :: const classes = new Set([...store.facts.values()].filter(f => f.p === 'isa' && !f.supersed",
+    "102 && → || :: const has = (s, p, o) => { const f = store.facts.get(key(s, p, o)); return f && !f.superse",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned",
+    "169 && → || :: const anyExplicitResolved = [...store.facts.values()].filter(f => f.s === s && f.p === p &",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "60 || → && :: if (f.superseded || f.p !== pred || f.s !== x) continue;",
+    "72 || → && :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "79 || → && :: for (const f of store.facts.values()) { if (f.inferred || !FUNCTIONAL.has(f.p)) continue; ",
+    "83 || → && :: group.sort((a, b) => score(b) - score(a) || b.lastDay - a.lastDay);",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "170 || → && :: if (anyExplicitResolved.length) { anyExplicitResolved.sort((a, b) => (b.conf * b.evidence)",
+    "176 || → && :: if (f.s !== C || f.p !== p || f.superseded) continue;",
+    "38 + 1 → - 1 :: export function ingest(store, episodes = [], day = store.day + 1) {"
+   ],
+   "S1": [
+    "73 < → <= :: if (report.merged < 0) report.merged = 0;",
+    "90 && → || :: const subs = new Set([...store.facts.values()].filter(f => f.p === p && !f.superseded).map",
+    "100 && → || :: const classes = new Set([...store.facts.values()].filter(f => f.p === 'isa' && !f.supersed",
+    "102 && → || :: const has = (s, p, o) => { const f = store.facts.get(key(s, p, o)); return f && !f.superse"
+   ],
+   "S2": [
+    "141 >= → > :: const salient = sub.episodes.some(e => e.conf >= 1.5);",
+    "73 < → <= :: if (report.merged < 0) report.merged = 0;",
+    "118 < → <= :: if (support.length < minInstances) continue;",
+    "133 === → !== :: const type = f.p === 'isa' ? 'generalizes' : FUNCTIONAL.has(f.p) ? 'attribute' : 'relates'",
+    "203 === → !== :: if (q.all) { got = fn(store, q).sort(); ok = JSON.stringify(got) === JSON.stringify([...q.",
+    "176 !== → === :: if (f.s !== C || f.p !== p || f.superseded) continue;",
+    "72 && → || :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "90 && → || :: const subs = new Set([...store.facts.values()].filter(f => f.p === p && !f.superseded).map",
+    "102 && → || :: const has = (s, p, o) => { const f = store.facts.get(key(s, p, o)); return f && !f.superse",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "79 || → && :: for (const f of store.facts.values()) { if (f.inferred || !FUNCTIONAL.has(f.p)) continue; ",
+    "170 || → && :: if (anyExplicitResolved.length) { anyExplicitResolved.sort((a, b) => (b.conf * b.evidence)",
+    "176 || → && :: if (f.s !== C || f.p !== p || f.superseded) continue;"
+   ],
+   "recorded": 52,
+   "killable": 34,
+   "suggested": 20,
+   "hits": [
+    "72 === → !== :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "169 === → !== :: const anyExplicitResolved = [...store.facts.values()].filter(f => f.s === s && f.p === p &",
+    "191 === → !== :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "191 === → !== :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o)))",
+    "60 !== → === :: if (f.superseded || f.p !== pred || f.s !== x) continue;",
+    "107 !== → === :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "34 && → || :: return { s, p, o, conf, day, text: (ep && ep.text) ? String(ep.text) : (s && p ? `${s} ${p",
+    "34 && → || :: return { s, p, o, conf, day, text: (ep && ep.text) ? String(ep.text) : (s && p ? `${s} ${p",
+    "169 && → || :: const anyExplicitResolved = [...store.facts.values()].filter(f => f.s === s && f.p === p &",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "188 && → || :: for (const f of store.facts.values()) if (f.s === s && f.p === p && !f.superseded && !f.in",
+    "60 || → && :: if (f.superseded || f.p !== pred || f.s !== x) continue;",
+    "72 || → && :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values",
+    "83 || → && :: group.sort((a, b) => score(b) - score(a) || b.lastDay - a.lastDay);",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "107 || → && :: if (f.superseded || f.inferred || f.s !== s || !GENERALIZABLE.has(f.p)) continue;",
+    "38 + 1 → - 1 :: export function ingest(store, episodes = [], day = store.day + 1) {"
+   ],
+   "contradicts": [
+    "100 && → || :: const classes = new Set([...store.facts.values()].filter(f => f.p === 'isa' && !f.supersed"
+   ],
+   "why": [
+    "141 >= → > :: const salient = sub.episodes.some(e => e.conf >= 1.5); — none of the 1856 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "73 < → <= :: if (report.merged < 0) report.merged = 0; — none of the 1719 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "118 < → <= :: if (support.length < minInstances) continue; — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "133 === → !== :: const type = f.p === 'isa' ? 'generalizes' : FUNCTIONAL.has(f.p) ? 'attribute' : 'relates' — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "203 === → !== :: if (q.all) { got = fn(store, q).sort(); ok = JSON.stringify(got) === JSON.stringify([...q. — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "176 !== → === :: if (f.s !== C || f.p !== p || f.superseded) continue; — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "72 && → || :: report.merged = (store._today || []).filter(e => e.triple).length - [...store.facts.values — an input changed the answer, but the test written from it did not pass on the real code and fail on the mutant",
+    "90 && → || :: const subs = new Set([...store.facts.values()].filter(f => f.p === p && !f.superseded).map — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "102 && → || :: const has = (s, p, o) => { const f = store.facts.get(key(s, p, o)); return f && !f.superse — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned — none of the 1719 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "142 && → || :: if (!triples && sub.degree === 0 && !salient) { store.subjects.delete(name); report.pruned — none of the 1719 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o))) — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o))) — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o))) — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "191 && → || :: if (f.s === C && f.p === p && !f.superseded && !(neg && store.facts.has(key(s, neg, f.o))) — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "79 || → && :: for (const f of store.facts.values()) { if (f.inferred || !FUNCTIONAL.has(f.p)) continue;  — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "170 || → && :: if (anyExplicitResolved.length) { anyExplicitResolved.sort((a, b) => (b.conf * b.evidence) — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)",
+    "176 || → && :: if (f.s !== C || f.p !== p || f.superseded) continue; — none of the 1797 inputs tried gave a different answer (an equivalent mutant, or one reached only through state, the clock, the disk or a callback)"
+   ],
+   "passesOnReal": true,
+   "fileSha256": "4f288c583c7b8afa287bb042f6b9a821e49a21e6997ad7471c588a9e5341f71f",
+   "fileTests": 61
+  }
+ ],
+ "notMeasured": [
+  {
+   "repo": "si-didy-cascade",
+   "commit": "10e5185",
+   "why": "the commit before it had no tests at all (test.mjs is added by 10e5185), so the gate cannot run there and there is no S0"
+  }
+ ],
+ "pooled": {
+  "killable": 45,
+  "hits": 22,
+  "share": 0.4888888888888889,
+  "falseTests": 0,
+  "c1": false
+ },
+ "note": "Run 2026-11-17 on plain copies (git archive with core.autocrlf=false, LF as CI checks out) of each repo at the commit before (S0, suggest) and at the commit (S1). An earlier CRLF run gave the same results for the-dreamer and png; forge.mjs could not run there (a test reads a template with LF markers). Suggested test files are kept by hash and count; re-run with tools/suggest-measure.mjs."
+}
